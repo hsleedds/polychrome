@@ -91,11 +91,13 @@ export function barsSVG(night, tz) {
   const bw = 22, gap = 6, Hh = 120, top = 14, W = n * (bw + gap) + gap, base = top + Hh;
   const defs = `<defs>
     <linearGradient id="au-weak" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bff1cf"/><stop offset="1" stop-color="#7fd9a0"/></linearGradient>
+    <linearGradient id="au-fair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3fbf74"/><stop offset="1" stop-color="#14864a"/></linearGradient>
     <linearGradient id="au-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6334a"/><stop offset=".16" stop-color="#c94a52"/><stop offset=".26" stop-color="#1fa05a"/><stop offset="1" stop-color="#0d6b3a"/></linearGradient>
     <linearGradient id="au-epic" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c2185b"/><stop offset=".2" stop-color="#d6334a"/><stop offset=".3" stop-color="#1fa05a"/><stop offset=".86" stop-color="#0d6b3a"/><stop offset="1" stop-color="#ff7eb6"/></linearGradient></defs>`;
   const bars = hs.map((h, k) => {
     const x = gap + k * (bw + gap), v = Math.max(0.03, h.score / 10), bh = v * Hh;
-    const fill = h.score >= 9 ? "url(#au-epic)" : h.score >= 4 ? "url(#au-mid)" : "url(#au-weak)";
+    // SPEC 4.6: 약함(0–4) 옅은 초록 · 5–6 진한 초록 · 7–8 초록 위 붉은 띠 · 9–10 아래 끝 분홍까지
+    const fill = h.score >= 9 ? "url(#au-epic)" : h.score >= 7 ? "url(#au-mid)" : h.score >= 5 ? "url(#au-fair)" : "url(#au-weak)";
     const lbl = k % 2 === 0 ? `<text x="${x + bw / 2}" y="${base + 14}" text-anchor="middle" class="b-ax">${esc(hourLabel(h.local, lang(), true))}</text>` : "";
     return `<rect x="${x}" y="${(base - bh).toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" rx="5" fill="${fill}"><title>${esc(h.local.slice(11))} · ${h.score}/10</title></rect>${h.score > 0 ? `<text x="${x + bw / 2}" y="${(base - bh - 3).toFixed(1)}" text-anchor="middle" class="b-v">${h.score}</text>` : ""}${lbl}`;
   }).join("");
