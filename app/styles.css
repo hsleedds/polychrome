@@ -83,7 +83,7 @@ body[data-screen=weather] { overflow: hidden; height: 100dvh; }
 .dot-b.add::after { content: "+"; width: auto; height: auto; background: none; font-size: 13px; line-height: 1; opacity: .6; color: var(--muted); }
 .dot-b.add.on::after { opacity: 1; color: var(--rain); width: auto; background: none; }
 .dot-b.gps::after { border-radius: 2px; transform: rotate(45deg); }
-.pager { flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.pager { position: relative; flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
 .pager::-webkit-scrollbar { display: none; }
 .pager.dragging { scroll-snap-type: none; cursor: grabbing; user-select: none; }
 .page { flex: 0 0 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow-y: auto; overscroll-behavior-y: contain; padding: 0 12px 16px; }
