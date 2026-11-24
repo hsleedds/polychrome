@@ -202,8 +202,11 @@ function renderB(root, ctx) {
   };
   const goTo = (k, smooth = true) => { const el = pager.children[k]; if (el) pager.scrollTo({ left: el.offsetLeft, behavior: smooth ? "smooth" : "auto" }); };
 
-  let raf = 0;
+  let raf = 0, lastW = pager.clientWidth;
+  // 창 크기·화면 회전이 바뀌면 보던 장을 그대로 유지 (크기 변화 중의 스크롤 값으로 장을 바꾸지 않음)
+  try { new ResizeObserver(() => { if (pager.clientWidth === lastW) return; lastW = pager.clientWidth; goTo(ctx.pagerIdx ?? 0, false); }).observe(pager); } catch { /* 구형 브라우저 */ }
   pager.addEventListener("scroll", () => {
+    if (pager.clientWidth !== lastW) return;
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => setActive(Math.round(pager.scrollLeft / Math.max(1, pager.clientWidth))));
   }, { passive: true });
