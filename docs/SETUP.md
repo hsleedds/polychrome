@@ -7,6 +7,11 @@
 
 ---
 
+## 00. 앱 공개 주소 켜기 (GitHub Pages, 한 번)
+1. https://github.com/hsleedds/polychrome → **Settings** → 왼쪽 **Pages**
+2. Source: **Deploy from a branch** → Branch: **main**, 폴더 **/ (root)** → **Save**
+3. 1~2분 뒤 `https://hsleedds.github.io/polychrome/` 에서 앱이 열립니다. (기상청 `kma` 함수는 이 주소에서만 응답하도록 되어 있어, 이 주소로 열어야 기상청 덮어쓰기가 보입니다.)
+
 ## 0. 미리 준비할 것
 
 ### 0-1. 공공데이터포털 활용신청 (키 `KMA_KEY` 하나로 모두 사용)
