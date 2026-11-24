@@ -1,0 +1,299 @@
+[
+  {
+    "stn": 90,
+    "name_ko": "속초",
+    "name_en": "Sokcho",
+    "lat": 38.25085,
+    "lon": 128.56473,
+    "elev": 17.53,
+    "verified": true
+  },
+  {
+    "stn": 95,
+    "name_ko": "철원",
+    "name_en": "Cheorwon",
+    "lat": 38.14787,
+    "lon": 127.3042,
+    "elev": 155.48,
+    "verified": true
+  },
+  {
+    "stn": 99,
+    "name_ko": "파주",
+    "name_en": "Paju",
+    "lat": 37.88589,
+    "lon": 126.76648,
+    "elev": 30.59,
+    "verified": true
+  },
+  {
+    "stn": 100,
+    "name_ko": "대관령",
+    "name_en": "Daegwallyeong",
+    "lat": 37.67713,
+    "lon": 128.71834,
+    "elev": 772.43,
+    "verified": true
+  },
+  {
+    "stn": 101,
+    "name_ko": "춘천",
+    "name_en": "Chuncheon",
+    "lat": 37.90262,
+    "lon": 127.7357,
+    "elev": 75.82,
+    "verified": true
+  },
+  {
+    "stn": 102,
+    "name_ko": "백령도",
+    "name_en": "Baengnyeongdo",
+    "lat": 37.97396,
+    "lon": 124.71237,
+    "elev": 36,
+    "verified": true
+  },
+  {
+    "stn": 105,
+    "name_ko": "강릉",
+    "name_en": "Gangneung",
+    "lat": 37.75147,
+    "lon": 128.89099,
+    "elev": 27.12,
+    "verified": true
+  },
+  {
+    "stn": 108,
+    "name_ko": "서울",
+    "name_en": "Seoul",
+    "lat": 37.57142,
+    "lon": 126.9658,
+    "elev": 85.67,
+    "verified": true
+  },
+  {
+    "stn": 112,
+    "name_ko": "인천",
+    "name_en": "Incheon",
+    "lat": 37.47772,
+    "lon": 126.6249,
+    "elev": 68.99,
+    "verified": true
+  },
+  {
+    "stn": 114,
+    "name_ko": "원주",
+    "name_en": "Wonju",
+    "lat": 37.33749,
+    "lon": 127.94659,
+    "elev": 150.11,
+    "verified": true
+  },
+  {
+    "stn": 115,
+    "name_ko": "울릉도",
+    "name_en": "Ulleungdo",
+    "lat": 37.48129,
+    "lon": 130.89864,
+    "elev": 221.14,
+    "verified": true
+  },
+  {
+    "stn": 119,
+    "name_ko": "수원",
+    "name_en": "Suwon",
+    "lat": 37.25746,
+    "lon": 126.983,
+    "elev": 39.81,
+    "verified": true
+  },
+  {
+    "stn": 127,
+    "name_ko": "충주",
+    "name_en": "Chungju",
+    "lat": 36.97045,
+    "lon": 127.9525,
+    "elev": 114.85,
+    "verified": true
+  },
+  {
+    "stn": 129,
+    "name_ko": "서산",
+    "name_en": "Seosan",
+    "lat": 36.77658,
+    "lon": 126.4939,
+    "elev": 25.25,
+    "verified": true
+  },
+  {
+    "stn": 131,
+    "name_ko": "청주",
+    "name_en": "Cheongju",
+    "lat": 36.63924,
+    "lon": 127.44066,
+    "elev": 58.7,
+    "verified": true
+  },
+  {
+    "stn": 133,
+    "name_ko": "대전",
+    "name_en": "Daejeon",
+    "lat": 36.37199,
+    "lon": 127.3721,
+    "elev": 67.79,
+    "verified": true
+  },
+  {
+    "stn": 136,
+    "name_ko": "안동",
+    "name_en": "Andong",
+    "lat": 36.57293,
+    "lon": 128.70734,
+    "elev": 141.26,
+    "verified": true
+  },
+  {
+    "stn": 138,
+    "name_ko": "포항",
+    "name_en": "Pohang",
+    "lat": 36.03201,
+    "lon": 129.38002,
+    "elev": 3.94,
+    "verified": true
+  },
+  {
+    "stn": 140,
+    "name_ko": "군산",
+    "name_en": "Gunsan",
+    "lat": 36.0053,
+    "lon": 126.76135,
+    "elev": 27.85,
+    "verified": true
+  },
+  {
+    "stn": 143,
+    "name_ko": "대구",
+    "name_en": "Daegu",
+    "lat": 35.87797,
+    "lon": 128.65295,
+    "elev": 54.27,
+    "verified": true
+  },
+  {
+    "stn": 146,
+    "name_ko": "전주",
+    "name_en": "Jeonju",
+    "lat": 35.84092,
+    "lon": 127.11718,
+    "elev": 60.44,
+    "verified": true
+  },
+  {
+    "stn": 152,
+    "name_ko": "울산",
+    "name_en": "Ulsan",
+    "lat": 35.58237,
+    "lon": 129.33469,
+    "elev": 81.14,
+    "verified": true
+  },
+  {
+    "stn": 155,
+    "name_ko": "창원",
+    "name_en": "Changwon",
+    "lat": 35.17019,
+    "lon": 128.57281,
+    "elev": 34.97,
+    "verified": true
+  },
+  {
+    "stn": 156,
+    "name_ko": "광주",
+    "name_en": "Gwangju",
+    "lat": 35.17294,
+    "lon": 126.89156,
+    "elev": 70.28,
+    "verified": true
+  },
+  {
+    "stn": 159,
+    "name_ko": "부산",
+    "name_en": "Busan",
+    "lat": 35.10468,
+    "lon": 129.03203,
+    "elev": 69.56,
+    "verified": true
+  },
+  {
+    "stn": 162,
+    "name_ko": "통영",
+    "name_en": "Tongyeong",
+    "lat": 34.84541,
+    "lon": 128.43561,
+    "elev": 31.24,
+    "verified": true
+  },
+  {
+    "stn": 165,
+    "name_ko": "목포",
+    "name_en": "Mokpo",
+    "lat": 34.81732,
+    "lon": 126.38151,
+    "elev": 44.7,
+    "verified": true
+  },
+  {
+    "stn": 168,
+    "name_ko": "여수",
+    "name_en": "Yeosu",
+    "lat": 34.73929,
+    "lon": 127.74063,
+    "elev": 65.93,
+    "verified": true
+  },
+  {
+    "stn": 184,
+    "name_ko": "제주",
+    "name_en": "Jeju",
+    "lat": 33.51411,
+    "lon": 126.52969,
+    "elev": 20.79,
+    "verified": true
+  },
+  {
+    "stn": 189,
+    "name_ko": "서귀포",
+    "name_en": "Seogwipo",
+    "lat": 33.24616,
+    "lon": 126.5653,
+    "elev": 51.86,
+    "verified": true
+  },
+  {
+    "stn": 192,
+    "name_ko": "진주",
+    "name_en": "Jinju",
+    "lat": 35.16378,
+    "lon": 128.04004,
+    "elev": 29.35,
+    "verified": true
+  },
+  {
+    "stn": 216,
+    "name_ko": "태백",
+    "name_en": "Taebaek",
+    "lat": 37.17038,
+    "lon": 128.98929,
+    "elev": 714.45,
+    "verified": true
+  },
+  {
+    "stn": 239,
+    "name_ko": "세종",
+    "name_en": "Sejong",
+    "lat": 36.48522,
+    "lon": 127.24438,
+    "elev": 89.5,
+    "verified": true
+  }
+]

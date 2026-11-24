@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Polychrome</title>
+<meta name="description" content="Polychrome — 사진가를 위한 날씨: 비 합의 예보, 오늘의 빛, 오로라 지수">
+<meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1a33" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="app/icons/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app/styles.css">
+<script src="core/weather-core.js"></script>
+<script src="core/sky-core.js"></script>
+<script type="module" src="app/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#screen">본문으로</a>
+<main id="screen" tabindex="-1"><div class="boot"><div class="spin" aria-hidden="true"></div></div></main>
+<nav id="tabs" class="tabs" aria-label="메뉴"></nav>
+<noscript><p style="padding:24px">Polychrome은 JavaScript가 필요합니다. / Polychrome needs JavaScript.</p></noscript>
+</body>
+</html>
