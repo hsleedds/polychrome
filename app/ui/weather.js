@@ -190,6 +190,7 @@ function renderB(root, ctx) {
   const loaded = new Set();
 
   const setActive = (k) => {
+    k = Math.max(0, Math.min(pages.length - 1, k | 0));
     dots.forEach((d, j) => { d.classList.toggle("on", j === k); d.setAttribute("aria-selected", j === k ? "true" : "false"); });
     ctx.pagerIdx = k;
     [k, k + 1, k - 1].forEach((j) => j >= 0 && j < pages.length && ensure(j)); // 이웃 미리 불러오기
@@ -202,13 +203,16 @@ function renderB(root, ctx) {
   };
   const goTo = (k, smooth = true) => { const el = pager.children[k]; if (el) pager.scrollTo({ left: el.offsetLeft, behavior: smooth ? "smooth" : "auto" }); };
 
+  const nearestIdx = () => { let best = 0, d = Infinity; [...pager.children].forEach((el, j) => { const x = Math.abs(el.offsetLeft - pager.scrollLeft); if (x < d) { d = x; best = j; } }); return best; };
   let raf = 0, lastW = pager.clientWidth;
   // 창 크기·화면 회전이 바뀌면 보던 장을 그대로 유지 (크기 변화 중의 스크롤 값으로 장을 바꾸지 않음)
   try { new ResizeObserver(() => { if (pager.clientWidth === lastW) return; lastW = pager.clientWidth; goTo(ctx.pagerIdx ?? 0, false); }).observe(pager); } catch { /* 구형 브라우저 */ }
   pager.addEventListener("scroll", () => {
     if (pager.clientWidth !== lastW) return;
     cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => setActive(Math.round(pager.scrollLeft / Math.max(1, pager.clientWidth))));
+    // 화면이 아직 배치되지 않았으면(폭 0) 무시 — 이때의 스크롤 값으로 장을 정하면 엉뚱한 장(지역 추가)으로 감
+    if (pager.clientWidth < 10) return;
+    raf = requestAnimationFrame(() => setActive(nearestIdx()));
   }, { passive: true });
   root.querySelector(".dots").addEventListener("click", (e) => { const b = e.target.closest("[data-go]"); if (b) goTo(+b.dataset.go); });
   pager.addEventListener("keydown", (e) => {
@@ -223,7 +227,11 @@ function renderB(root, ctx) {
     if (r) { const k = [...pager.children].indexOf(r.closest(".page")); loaded.delete(k); ensure(k); }
   });
 
-  requestAnimationFrame(() => { goTo(Math.min(startIdx, pages.length - 1), false); setActive(Math.min(startIdx, pages.length - 1)); });
+  const first = Math.min(startIdx, pages.length - 1);
+  setActive(first);
+  // 배치가 끝난 뒤 시작 장으로 이동 (폭이 0이면 다음 프레임에 다시 시도)
+  const place = (tries) => { if (pager.clientWidth < 10 && tries > 0) return requestAnimationFrame(() => place(tries - 1)); lastW = pager.clientWidth; goTo(first, false); };
+  requestAnimationFrame(() => place(30));
 }
 
 /** 마우스로 끌어서 넘기기 (터치·트랙패드는 기본 스크롤 스냅) */
