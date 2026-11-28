@@ -12,9 +12,8 @@ const descKey = (key) => "shoot." + key + (!ownForecast() && (key === "forecast"
 export const SHOOT_ITEMS = [
   { key: "forecast", icon: "camera" },
   { key: "line", icon: "line" },
-  { key: "dates", icon: "calendar", href: "#/shoot/silhouette", live: true }, // 날짜 찾기는 실루엣 미리보기의 「겹치는 날짜」
+  // 해·달 맞추기 = 옛 날짜 찾기·실루엣 미리보기·가상 시야 통합 (HS 2026-11-28). 「촬영 라인」은 반대 질문(이날 어디서?)
   { key: "silhouette", icon: "silhouette", live: true },
-  { key: "view", icon: "mountain" },
   { key: "aurora", icon: "aurora", href: "#/aurora", live: true },
   { key: "drone", icon: "drone" },
   { key: "quake", icon: "volcano" },

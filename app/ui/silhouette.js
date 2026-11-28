@@ -11,6 +11,7 @@ import {
   lensFov, hourTicks, pathSegments, worstState, horizonState, unwrapAz, wrap180, viewWindows,
 } from "../silhouette-calc.js";
 import { createScan, skyState, groupDays, scanKey, alignBand, bandHit } from "../align-finder.js";
+import { buildingSource, buildingsNear, buildingPolygons } from "../buildings.js";
 
 /* 서울 랜드마크만 있으므로 시간대는 서울 고정 (다른 나라 구조물이 생기면 landmark.tz 로) */
 const TZ = "Asia/Seoul";
@@ -76,8 +77,8 @@ function loadPrefs() {
   try { const o = JSON.parse(st.get(KEY) || "null"); return o && typeof o === "object" ? o : {}; } catch { return {}; }
 }
 function savePrefs(p) {
-  const { id, body, lat, lon, eye, zoom, lens, preset } = p;
-  st.set(KEY, JSON.stringify({ id, body, lat, lon, eye, zoom, lens, preset }));
+  const { id, body, lat, lon, eye, zoom, lens, preset, bld } = p;
+  st.set(KEY, JSON.stringify({ id, body, lat, lon, eye, zoom, lens, preset, bld }));
 }
 
 /* ---------- 내 촬영지 (사용자가 추가, 기기에만 저장 — 서버로 보내지 않음) ---------- */
@@ -172,6 +173,7 @@ export async function renderSilhouette(root, ctx) {
     zoom: saved.zoom === "wide" ? "wide" : "fit",
     lens: LENSES.includes(saved.lens) ? saved.lens : 0,
     preset: Number.isInteger(saved.preset) ? saved.preset : 0,
+    bld: saved.bld !== false, // 주변 건물 (기본 켬 — 자료가 생기면 세 보기 모두에 반영)
   };
   if (P.lat == null || P.lon == null) { const p = (PRESETS[P.id] || [])[0]; if (p) { P.lat = p.lat; P.lon = p.lon; P.preset = 0; } }
   let M = null; // 계산 결과
@@ -233,21 +235,30 @@ export async function renderSilhouette(root, ctx) {
       <div class="sil-find-list" aria-live="polite"></div>
     </section>
     <section class="card sil-card">
+      <div class="seg sil-viewsw" role="group" aria-label="${esc(t("v3.view"))}">
+        <button type="button" data-view="sil" aria-pressed="true" class="on">${esc(t("v3.viewSil"))}</button>
+        <button type="button" data-view="3d" aria-pressed="false">${esc(t("v3.view3d"))}</button>
+        <button type="button" data-view="drone" aria-pressed="false">${esc(t("v3.viewDrone"))}</button>
+      </div>
       <p class="sil-sum" aria-live="polite"></p>
       <p class="sil-inview muted"></p>
       <div class="sil-chart"></div>
+      <div class="sil-3d" hidden></div>
       <div class="sil-time">
         <button type="button" class="icon-btn sil-play" aria-label="${esc(t("sil.play"))}"><span aria-hidden="true">▶</span></button>
         <input id="sil-t" type="range" min="0" max="1440" step="1" value="0" aria-label="${esc(t("sil.timeA11y"))}">
         <output class="sil-clock" for="sil-t">--:--</output>
         <button type="button" class="btn ghost sil-now">${esc(t("sil.now"))}</button>
       </div>
+      <div class="sil-3d-ctl"></div>
       <dl class="sil-read"></dl>
       <div class="sil-opts">
         <div class="seg" role="group" aria-label="${esc(t("sil.zoom"))}">
           <button type="button" data-zoom="fit" aria-pressed="${P.zoom === "fit"}" class="${P.zoom === "fit" ? "on" : ""}">${esc(t("sil.zoomFit"))}</button>
           <button type="button" data-zoom="wide" aria-pressed="${P.zoom === "wide"}" class="${P.zoom === "wide" ? "on" : ""}">${esc(t("sil.zoomWide"))}</button>
         </div>
+        <div class="sil-bld"><label class="sw"><input type="checkbox" id="sil-bld"${P.bld ? " checked" : ""}> <span>${esc(t("sil.buildings"))}</span></label>
+          <span class="tiny muted sil-bld-note"${buildingSource() ? " hidden" : ""}>${esc(t("sil.bldPending"))}</span></div>
         <label class="fld"><span>${esc(t("sil.lens"))}</span><select id="sil-lens"><option value="0">${esc(t("sil.lensNone"))}</option>${LENSES.map((f) => `<option value="${f}"${f === P.lens ? " selected" : ""}>${f} mm</option>`).join("")}</select></label>
       </div>
       <div class="sil-notes muted tiny"></div>
@@ -352,6 +363,7 @@ export async function renderSilhouette(root, ctx) {
     parts.push(`<line x1="0" x2="${W}" y1="${f1(y0)}" y2="${f1(y0)}" class="sil-hz"/>`);
     // 구조물
     const d = sil.polygons.map((poly) => "M" + poly.map(([az, alt]) => `${f1(V.x(az))} ${f1(V.y(alt))}`).join("L") + "Z").join("");
+    if (P.bld && M.bldPolys?.length) parts.push(`<path d="${M.bldPolys.map((poly) => "M" + poly.map(([az, alt]) => `${f1(V.x(az))} ${f1(V.y(alt))}`).join("L") + "Z").join("")}" class="sil-bldg"/>`);
     parts.push(`<path d="${d}" class="sil-lm"/>`);
     // 궤적 (점선) + 정시 눈금
     const segs = pathSegments(samples, V, MIN_ALT, { strict: true, visible: notSet }); // 화면 안 구간만
@@ -477,6 +489,7 @@ export async function renderSilhouette(root, ctx) {
     const ratio = sil.angularHeightDeg > 0 ? s.diamDeg / sil.angularHeightDeg : null;
     rows.push([t("sil.ratio"), ratio != null ? `${t("sil." + P.body)} ${t("sil.ratioV", { v: ratio < 0.1 ? ratio.toFixed(3) : ratio.toFixed(2) })}` : "–"]);
     readEl.innerHTML = rows.map(([a, b]) => `<div><dt>${esc(a)}</dt><dd>${b.startsWith("<span") ? b : esc(b)}</dd></div>`).join("");
+    v3?.draw();
   }
 
   function summaryText() {
@@ -538,7 +551,58 @@ export async function renderSilhouette(root, ctx) {
     inviewEl.textContent = M.inView.length ? t("sil.inView", { when: M.inView.map(span2).join(", ") }) : t("sil.inViewNone");
     notes();
     maybeTerrain();
+    maybeBuildings();
     startFinder();
+    v3?.refresh();
+  }
+
+  /* ---- 주변 건물 (buildingSource 가 생기면; 지금은 자료 준비 중) ---- */
+  let bldKey = "", bldList = null;
+  function maybeBuildings() {
+    if (!M) return;
+    if (!P.bld || !buildingSource()) { M.bldPolys = null; return; }
+    const key = `${P.lat},${P.lon}`;
+    const apply = () => { if (M && bldList) { M.bldPolys = buildingPolygons(bldList, { lat: P.lat, lon: P.lon, zM: M.groundM + P.eye }, M.sil.bearingDeg); } };
+    if (key === bldKey) { if (bldList && !M.bldPolys) { apply(); drawStatic(); drawDynamic(); } return; }
+    bldKey = key; bldList = null;
+    buildingsNear(P.lat, P.lon, 3).then((a) => { if (key !== bldKey || !root.isConnected) return; bldList = a || []; apply(); if (M) { drawStatic(); drawDynamic(); } });
+  }
+
+  /* ---- 보기 전환: 실루엣 | 3D 풍경 | 드론 (3D 모듈·three.js 는 처음 열 때만 불러옴) ---- */
+  let view = "sil", v3 = null, v3Loading = null;
+  const v3El = $(".sil-3d");
+  const host = {
+    obs: () => ({ lat: P.lat, lon: P.lon, eye: P.eye, groundM: M?.groundM ?? 0 }),
+    landmark: () => M?.lm || null,
+    lens: () => P.lens,
+    body: () => P.body,
+    time: () => tMs,
+    bodyAt: (ms) => (M ? sampleAt(ms) : null),
+    sunAt: (ms) => { const s = sunPos(new Date(ms), P.lat, P.lon); return { az: s.az, alt: s.altApparent ?? s.alt }; },
+    samples: () => M?.samples || [],
+    hourOf: (ms) => { const s = dateToLocal(new Date(ms), TZ); return s.slice(14, 16) === "00" ? +s.slice(11, 13) : null; },
+    terrain: () => (G.TerrainCore && typeof G.TerrainCore.terrariumSource === "function" ? G.TerrainCore : null),
+    lc: () => LC(),
+    buildings: () => P.bld,
+    onPlayStop: () => stop(),
+    controlsSlot: () => $(".sil-3d-ctl"),
+  };
+  async function setView(v) {
+    view = v;
+    body.querySelectorAll("[data-view]").forEach((x) => { const on = x.dataset.view === v; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
+    const is3 = v !== "sil";
+    chart.hidden = is3; v3El.hidden = !is3;
+    const zs = body.querySelector(".sil-opts .seg"); if (zs) zs.hidden = is3; // 맞춤·넓게 는 실루엣 전용
+    if (!is3) { v3?.dispose(); v3 = null; v3El.innerHTML = ""; return; }
+    const mode = v === "drone" ? "drone" : "ground";
+    if (v3) { v3.setMode(mode); return; }
+    if (v3Loading) return;
+    v3El.innerHTML = `<div class="v3-msg static"><div class="spin" aria-hidden="true"></div><span>${esc(t("v3.loading"))}</span></div>`;
+    v3Loading = import("./view3d.js").then((mod) => {
+      if (view === "sil" || !root.isConnected) return;
+      v3 = mod.createView3d(v3El, host, view === "drone" ? "drone" : "ground");
+    }).catch((e) => { console.warn(e); v3El.innerHTML = `<p class="muted">${esc(t("v3.noThree"))}</p>`; })
+      .finally(() => { v3Loading = null; });
   }
 
   /* ---- 겹치는 날짜 찾기 (앞으로 12개월, 조각 실행·취소·캐시) ---- */
@@ -693,7 +757,8 @@ export async function renderSilhouette(root, ctx) {
   $("#sil-date").addEventListener("change", (e) => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) { P.date = e.target.value; refresh(); } });
   body.addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.body) { P.body = b.dataset.body; segOn(b, "body"); refresh(); }
+    if (b.dataset.view) { if (b.dataset.view !== view) setView(b.dataset.view); }
+    else if (b.dataset.body) { P.body = b.dataset.body; segOn(b, "body"); refresh(); }
     else if (b.dataset.zoom) { P.zoom = b.dataset.zoom; segOn(b, "zoom"); refresh({ keepTime: true }); }
     else if (b.dataset.preset != null) {
       const p = PRESETS[P.id][+b.dataset.preset]; if (!p) return;
@@ -746,7 +811,8 @@ export async function renderSilhouette(root, ctx) {
     e.target.setCustomValidity(""); e.target.value = "";
     $("#sil-lat").value = p.lat; $("#sil-lon").value = p.lon; onPos();
   });
-  $("#sil-lens").addEventListener("change", (e) => { P.lens = +e.target.value || 0; savePrefs(P); if (M) drawLens(); });
+  $("#sil-lens").addEventListener("change", (e) => { P.lens = +e.target.value || 0; savePrefs(P); if (M) drawLens(); v3?.draw(); });
+  $("#sil-bld").addEventListener("change", (e) => { P.bld = !!e.target.checked; savePrefs(P); bldKey = ""; if (M) { maybeBuildings(); drawStatic(); drawDynamic(); } v3?.buildingsChanged(); });
   range.addEventListener("input", () => { if (!M) return; stop(); tMs = M.t0 + (+range.value) * 60e3; drawDynamic(); });
 
   refresh();

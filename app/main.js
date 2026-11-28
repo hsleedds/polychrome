@@ -86,6 +86,7 @@ function render() {
     else if (top === "city" && parts[1]) renderDetail(el, ctx, parts[1], parts[2] === "day" ? parts[3] : null);
     else if (top === "add") renderSearch(el, ctx, parts[1] === "aurora" ? "aurora" : "weather");
     else if (top === "settings") renderSettings(el, ctx);
+    else if (top === "shoot" && ["dates", "view"].includes(parts[1])) { location.replace("#/shoot/silhouette"); return; } // 해·달 맞추기로 통합
     else if (top === "shoot" && parts[1] === "silhouette") renderSilhouette(el, ctx);
     else if (top === "shoot" && parts[1]) renderShootPlaceholder(el, ctx, parts[1]);
     else if (top === "shoot") renderShootMenu(el, ctx);

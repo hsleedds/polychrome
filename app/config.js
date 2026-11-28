@@ -25,6 +25,11 @@ export const DEFAULT_FLAGS = Object.freeze({
   // SPEC 12 — 「해외 모델 하나로」·「직접 설정」을 Pro로 잠글지. 테스트 기간(off)에는 누구나 전부 사용.
   // 켜면 잠금 표시 + 기상청 우선으로 표시 (Pro 결제는 아직 없음 — 잠금 화면만).
   pro_gate: false,
+  // SPEC 4.7 — 드론 공역 확인. 정적 자료(data/drone/kr.json, AIP Korea 좌표)로 브라우저 안에서만 판정 —
+  // 서버·키·외부 호출 없음, 「비행 가능」 단정 없이 경고·공식 링크만 보여 주므로 기본 on.
+  drone_zones: true,
+  // VWorld 공역 레이어 프록시(server/functions/drone-zones, VWORLD_KEY 필요). 배포 전까지 off.
+  drone_zones_server: false,
 });
 
 export const MAX_CITIES = 5;
