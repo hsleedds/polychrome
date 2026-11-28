@@ -1,9 +1,9 @@
 /* 날씨 탭: 기본 화면(B, 좌우 넘김) · 보조 화면(A, 메인 + 2×2) */
-import { getWeather, peekWeather, getAir, getModels, peekModels, flag } from "../data.js";
+import { getWeather, peekWeather, getAir, getModels, peekModels, flag, ownForecast } from "../data.js";
 import { icon } from "../icons.js";
 import { t, cityName, lang } from "../i18n.js";
 import { esc, actionSheet, onLongPress, toast } from "./dom.js";
-import { buildVM, summaryText, condText, sunsetGlow, nightCloud, isDayAt } from "./vm.js";
+import { buildVM, summaryText, condText, sunsetGlow, nightCloud, isDayAt, primarySrc, cloudSrc } from "./vm.js";
 import { temp, precip, hourLabel, dayLabel, relTime, clockAt, dateToLocal, addDays, ymdOf, pct } from "../format.js";
 import { iconKey, isWet, riseSet, twilight, moonPos, moonPhaseName, hasSky } from "../core.js";
 import { MAX_CITIES } from "../config.js";
@@ -27,7 +27,23 @@ export function airLine(vm) {
   return `<div class="mc-line">${parts.join(" · ")}${a.estimated ? ` <span class="muted">(${esc(t("air.estimated"))})</span>` : ""}</div>`;
 }
 
+/** 출처 이름 (기상청 / Open-Meteo / MET Norway) */
+export const srcName = (k) => t("srcName." + k);
+/** SPEC 11 각주 — 기관 예보를 그대로 정리했다는 안내 (own_forecast off 일 때만) */
+export function asPublishedNote() { return ownForecast() ? "" : `<p class="as-published muted tiny">${esc(t("note.asPublished"))}</p>`; }
+
+/** own_forecast off: 주 예보 값 그대로 + 출처, 기관 집계 「N곳 중 M곳」 */
+function rainLineRaw(vm, units) {
+  const r = vm.r24, a = vm.agency, src = srcName(primarySrc(vm.res));
+  const cnt = a && a.n >= 2 ? ` · ${esc(t("models.agree", { n: a.n, m: a.m }))}` : "";
+  const ic = icon("umbrella", { cls: "sm" });
+  if (!r) return cnt ? `<div class="mc-line rain">${ic}<span class="mc-txt">${cnt.slice(3)}</span></div>` : "";
+  if (!r.wet && (r.maxProb ?? 0) < 20) return `<div class="mc-line rain">${ic}<span class="mc-txt">${esc(t("rain.line.noneSrc", { src }))}${cnt}</span></div>`;
+  return `<div class="mc-line rain${r.wet ? " wet" : ""}">${ic}<span class="mc-txt">${esc(t("rain.line.probSrc", { prob: Math.round(r.maxProb ?? 0), src }))}${r.totalMm > 0 ? " · " + esc(precip(r.totalMm, units)) : ""}${cnt}</span></div>`;
+}
+
 export function rainLine(vm, units) {
+  if (!ownForecast()) return rainLineRaw(vm, units);
   const c = vm.cons, r = vm.r24;
   if (c && c.n >= 2 && c.prob != null) {
     const wetN = Math.round(c.prob / 100 * c.n);
@@ -85,7 +101,8 @@ export function dailyHTML(vm, units, cityId) {
 
 /** 48시간 안 비 → 비 카드 */
 export function rainCardHTML(vm, units) {
-  const r = vm.r48, H = vm.H, c = vm.cons;
+  const own = ownForecast();
+  const r = vm.r48, H = vm.H, c = own ? vm.cons : null;
   const bars = [];
   for (let k = 0; k < 48 && vm.i + k < H.time.length; k++) {
     const j = vm.i + k, mm = H.precipitation?.[j] || 0, wet = isWet(H.precipitation_probability?.[j], mm);
@@ -98,8 +115,10 @@ export function rainCardHTML(vm, units) {
   if (c && c.mmLo != null && c.mmHi != null && c.mmHi > c.mmLo) amount += ` (${precip(c.mmLo, units)}–${precip(c.mmHi, units)})`;
   lines.push(`<div class="rc-row"><span>${esc(t("rain.card.amount"))}</span><b>${esc(amount)}</b></div>`);
   lines.push(`<div class="rc-row"><span>${esc(t("rain.card.prob"))}</span><b>${esc(pct(r.maxProb))}</b></div>`);
+  if (!own && vm.agency && vm.agency.n >= 2) lines.push(`<div class="rc-row"><span>${esc(t("rain.card.agencies"))}</span><b>${esc(t("models.agree", { n: vm.agency.n, m: vm.agency.m }))}</b></div>`);
   if (c && c.n >= 2) lines.push(`<div class="rc-row"><span>${esc(t("rain.card.agree"))}</span><b>${esc(t("rain.card.agreeN", { m: Math.round((c.prob ?? 0) / 100 * c.n), n: c.n, grade: t("grade." + (c.grade || "low")) }))}</b></div>`);
-  return `<section class="card rain-card"><h3 class="card-h">${icon("umbrella", { cls: "sm" })} ${esc(t("rain.card.title"))}</h3>
+  const srcH = own ? "" : ` <small class="muted">${esc(t("rain.card.basis", { src: srcName(primarySrc(vm.res)) }))}</small>`;
+  return `<section class="card rain-card"><h3 class="card-h">${icon("umbrella", { cls: "sm" })} ${esc(t("rain.card.title"))}${srcH}</h3>
     <div class="rc-bars" aria-hidden="true">${bars.join("")}</div><div class="rc-axis"><span>${esc(t("now"))}</span><span>+24h</span><span>+48h</span></div>${lines.join("")}</section>`;
 }
 
@@ -122,7 +141,8 @@ export function lightCardHTML(vm, units) {
     rows.push(`<div class="lc-row"><span class="dot blue"></span><span>${esc(t("light.blue"))}</span><b>${esc(span(tw.blue?.am))} · ${esc(span(tw.blue?.pm))}</b></div>`);
   }
   const glow = rs?.set ? sunsetGlow(vm.H, dateToLocal(rs.set, tz)) : null;
-  if (glow) rows.push(`<div class="lc-row glow-${glow.level}"><span class="dot glow"></span><span>${esc(t("light.glow"))}</span><b>${esc(t("light.glow." + glow.level))}</b><small class="muted">${esc(t("light.clouds", { hi: Math.round(glow.hi), mid: Math.round(glow.mid), low: Math.round(glow.low) }))}</small></div>`);
+  if (glow && !ownForecast()) rows.push(`<div class="lc-row glow-cond"><span class="dot glow"></span><span>${esc(t("light.glowCond"))}</span><b>${esc(t("light.clouds", { hi: Math.round(glow.hi), mid: Math.round(glow.mid), low: Math.round(glow.low) }))}</b><small class="muted">${esc(t("light.srcParen", { src: srcName(cloudSrc(vm.res)) }))}</small></div>`);
+  else if (glow) rows.push(`<div class="lc-row glow-${glow.level}"><span class="dot glow"></span><span>${esc(t("light.glow"))}</span><b>${esc(t("light.glow." + glow.level))}</b><small class="muted">${esc(t("light.clouds", { hi: Math.round(glow.hi), mid: Math.round(glow.mid), low: Math.round(glow.low) }))}</small></div>`);
   // 달
   let mrs = null, mp = vm.moon;
   try { mrs = riseSet("moon", vm.today, c.lat, c.lon, tz); } catch { /* */ }
@@ -131,7 +151,7 @@ export function lightCardHTML(vm, units) {
     rows.push(`<div class="lc-row">${icon("moon-phase", { cls: "sm", phase: mp.phase, south: c.lat < 0 })}<span>${esc(t(moonPhaseName(mp.phase)))} ${esc(pct(mp.illum * 100))}</span><b>${esc(t("moon.riseSet", { rise: clockAt(mrs?.rise, tz), set: clockAt(mrs?.set, tz) }))}</b></div>`);
   }
   const nc = nightCloud(vm.H, vm.today);
-  if (nc != null) rows.push(`<div class="lc-row"><span class="dot night"></span><span>${esc(t("light.nightCloud"))}</span><b>${esc(pct(nc))}</b></div>`);
+  if (nc != null) rows.push(`<div class="lc-row"><span class="dot night"></span><span>${esc(t("light.nightCloud"))}</span><b>${esc(pct(nc))}</b>${ownForecast() ? "" : `<small class="muted">${esc(t("light.srcParen", { src: srcName(cloudSrc(vm.res)) }))}</small>`}</div>`);
   return `<section class="card light-card"><h3 class="card-h">${esc(t("light.title"))} <small class="muted">${esc(label)}</small></h3>${rows.join("")}${hasSky() ? "" : `<p class="muted tiny">${esc(t("light.approx"))}</p>`}</section>`;
 }
 
@@ -169,7 +189,7 @@ export function renderWeather(root, ctx) {
 }
 
 function pageBody(vm, units) {
-  return mainCardHTML(vm, units) + dailyHTML(vm, units, vm.city.id) + adaptiveHTML(vm, units);
+  return mainCardHTML(vm, units) + dailyHTML(vm, units, vm.city.id) + adaptiveHTML(vm, units) + asPublishedNote();
 }
 
 function renderB(root, ctx) {
@@ -299,7 +319,7 @@ function renderA(root, ctx) {
     <div class="a-extra"></div>
     <p class="muted tiny center">${esc(t("layoutA.hint"))}</p></div>`;
   const mainEl = root.querySelector(".a-main"), extra = root.querySelector(".a-extra"), src = root.querySelector(".ph-src");
-  const upd = (vm) => { mainEl.innerHTML = mainCardHTML(vm, units); extra.innerHTML = adaptiveHTML(vm, units); src.innerHTML = sourceBadge(vm.res); };
+  const upd = (vm) => { mainEl.innerHTML = mainCardHTML(vm, units); extra.innerHTML = adaptiveHTML(vm, units) + asPublishedNote(); src.innerHTML = sourceBadge(vm.res); };
   loadCity(main, { onUpdate: upd }).then((vm) => loadModels(main, vm.res, vm.air, upd)).catch(() => { mainEl.innerHTML = errorBox(main.id); });
   for (const c of others) {
     const cell = root.querySelector(`.cell[data-id="${CSS.escape(c.id)}"] .cell-body`);

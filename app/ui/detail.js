@@ -1,10 +1,10 @@
 /* 도시 상세: 시간별 24시간 · 7일 · 비 카드 · 기관 비교 · 생활 카드. 날짜 지정 시 그날 시간별 */
-import { getModels, peekModels, getAir, getWeather } from "../data.js";
+import { getModels, peekModels, getAir, getWeather, ownForecast } from "../data.js";
 import { icon } from "../icons.js";
 import { t, cityName, lang } from "../i18n.js";
 import { esc, header } from "./dom.js";
 import { buildVM, isDayAt, condText, modelsForConsensus } from "./vm.js";
-import { mainCardHTML, dailyHTML, rainCardHTML, lightCardHTML, sourceBadge } from "./weather.js";
+import { mainCardHTML, dailyHTML, rainCardHTML, lightCardHTML, sourceBadge, asPublishedNote } from "./weather.js";
 import { temp, precip, wind, hourLabel, dayLabel, monthDay, clockAt, pct, compassKey, uvLevel, ymdOf } from "../format.js";
 import { iconKey, isWet, fogLevel, riseSet, consensusFor } from "../core.js";
 
@@ -40,11 +40,11 @@ function modelsHTML(vm, units) {
     return `<li class="${wet ? "wet" : ""}${old ? " old" : ""}"><span class="m-n">${esc(modelName(m))}${m.dom ? ` <small class="chip">${esc(t("models.domestic"))}</small>` : ""}${m.sub && lang() === "ko" ? ` <small class="muted">${esc(m.sub)}</small>` : ""}</span>
       <span class="m-v">${n ? esc(precip(s, units)) : "–"}</span><span class="m-w">${wet ? esc(t("models.wet")) : esc(t("models.dry"))}</span></li>`;
   });
-  const c = vm.cons;
+  const c = ownForecast() ? vm.cons : null; // SPEC 11: 합의 확률·등급은 own_forecast 일 때만
   const head = c && c.prob != null ? `<p class="models-sum">${esc(t("models.consensus", { prob: c.prob, grade: t("grade." + (c.grade || "low")) }))}${c.core ? "" : ` <small class="muted">(${esc(t("models.equal"))})</small>`}</p>` : "";
   return `<section class="card models"><h3 class="card-h">${esc(t("models.title"))}</h3>
-    <p class="models-big"><b>${esc(t("models.agree", { n: ms.length, m: wetN }))}</b> <small class="muted">${esc(t("models.window"))}</small></p>${head}
-    <ul class="models-list">${rows.join("")}</ul></section>`;
+    <p class="models-big"><b>${esc(t("models.agree", vm.agency || { n: ms.length, m: wetN }))}</b> <small class="muted">${esc(t("models.window"))}</small></p>${head}
+    <ul class="models-list">${rows.join("")}</ul>${ownForecast() ? "" : `<p class="muted tiny">${esc(t("models.rawNote"))}</p>`}</section>`;
 }
 
 function lifeHTML(vm, units) {
@@ -107,10 +107,10 @@ export async function renderDetail(root, ctx, cityId, dayYmd) {
   const draw = () => {
     if (!root.isConnected) return;
     const vm = buildVM(city, res, air, models);
-    if (dayYmd) { body.innerHTML = dayHTML(vm, dayYmd, units) + dailyHTML(vm, units, city.id); return; }
+    if (dayYmd) { body.innerHTML = dayHTML(vm, dayYmd, units) + dailyHTML(vm, units, city.id) + asPublishedNote(); return; }
     body.innerHTML = mainCardHTML(vm, units, { tappable: false }) +
       `<section class="card"><h3 class="card-h">${esc(t("detail.hourly"))}${res.kmaBase ? ` <small class="muted">${esc(t("detail.kmaNote"))}</small>` : ""}</h3>${hourCols(vm, vm.i, vm.i + 24, units)}</section>` +
-      dailyHTML(vm, units, city.id) + (vm.r48?.wet ? rainCardHTML(vm, units) : "") + modelsHTML(vm, units) + lifeHTML(vm, units) + lightCardHTML(vm, units);
+      dailyHTML(vm, units, city.id) + (vm.r48?.wet ? rainCardHTML(vm, units) : "") + modelsHTML(vm, units) + lifeHTML(vm, units) + lightCardHTML(vm, units) + asPublishedNote();
   };
   draw();
   getAir(city).then((a) => { air = a; draw(); });

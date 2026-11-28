@@ -52,6 +52,10 @@ async function sbJson(path, opt = {}, ms = 8000) {
 let flags = { ...DEFAULT_FLAGS };
 export const flag = (k) => !!flags[k];
 export const allFlags = () => ({ ...flags });
+/** SPEC 11 — 우리 예측(판정·점수)을 화면에 낼지. 기본 false */
+export const ownForecast = () => flag("own_forecast");
+/** 테스트·관리자용: 스위치 값 덮어쓰기 */
+export function setFlags(o) { flags = { ...flags, ...o }; }
 const truthy = (v) => v === true || v === 1 || v === "true" || v === "on" || v === "1" || (v && typeof v === "object" && v.on === true);
 export async function loadFlags() {
   const c = cacheGet("flags", 60);

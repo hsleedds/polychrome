@@ -109,6 +109,7 @@ body[data-screen=weather] { overflow: hidden; height: 100dvh; }
 .mc-line { font-size: 13.5px; color: var(--on-navy-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 2px 0; }
 .mc-line.wet { color: #fff; font-weight: 500; } .mc-line.wet .ico { color: #8cc4ff; }
 .mc-line b { font-weight: 700; }
+.mc-line .mc-txt { flex: 1 1 0; min-width: 0; } .mc-line > .ico { flex: none; align-self: flex-start; margin-top: 2px; }
 .main-card .air-good { color: #8ff0b6; } .main-card .air-moderate { color: #9fd0ff; } .main-card .air-bad { color: #ffc47a; } .main-card .air-verybad { color: #ff9a9a; }
 .strip { list-style: none; margin: 12px -6px 0; padding: 10px 0 0; display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.15); }
 .strip li { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px; min-width: 0; flex: 1; }
@@ -231,6 +232,17 @@ ul.plain { margin: 0; padding-left: 18px; font-size: 14px; }
 @media (prefers-color-scheme: light) { .moon-curve { stroke: #b08a1e; } }
 .moon-key { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .au-dark { font-weight: 500; margin: 8px 0 0; }
+/* SPEC 11 — 기관 자료·조건만 (own_forecast off) */
+.au-v .au-kp { font-size: 17px; } .au-v small { text-align: right; }
+.au-kpline { margin: 4px 0; font-size: 15px; }
+.au-bars.raw .sky-dk1 { fill: #6b7fb3; fill-opacity: .10; } .au-bars.raw .sky-dk2 { fill: #34477a; fill-opacity: .22; } .au-bars.raw .sky-dk3 { fill: #0b1430; fill-opacity: .38; }
+.au-bars.raw .cloud-bar { fill: #eef2fa; stroke: #7d8aa6; stroke-width: 1; } .au-bars.raw .b-v { font-weight: 500; }
+@media (prefers-color-scheme: dark) { .au-bars.raw .cloud-bar { fill: #dfe6f4; stroke: #fff; } .au-bars.raw .sky-dk3 { fill: #000; fill-opacity: .45; } }
+.raw-key { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.raw-key li { display: flex; align-items: center; gap: 5px; }
+.raw-key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.raw-key .k-cloud { background: #eef2fa; border: 1px solid #7d8aa6; } .raw-key .k-dark { background: linear-gradient(90deg, rgba(107,127,179,.25), rgba(11,20,48,.6)); }
+.as-published { text-align: center; margin: 4px 0 12px; }
 
 /* ---- 관리자 ---- */
 .table-wrap { overflow-x: auto; } table { border-collapse: collapse; font-size: 12px; } th, td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }

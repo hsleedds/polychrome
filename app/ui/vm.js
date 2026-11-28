@@ -23,6 +23,25 @@ export function modelsForConsensus(models, H) {
   return list.map((m, k) => ({ id: m.id || m.name || "m" + k, name: m.name, sub: m.sub, dom: m.dom, p: shift ? m.p.slice(shift) : m.p, pp: m.pp ? (shift ? m.pp.slice(shift) : m.pp) : undefined, issued: m.issued }));
 }
 
+/** 기관별 원래 예보를 그대로 세기: 앞으로 hours 시간 안에 한 시간이라도 비(isWet)인 기관 수.
+ *  가중치·보정 없음 (SPEC 11: 「N곳 중 M곳 비 예상」 집계만 허용) */
+export function agencyCount(cm, from, hours = 24) {
+  if (!cm || !cm.length) return null;
+  let m = 0, n = 0;
+  for (const x of cm) {
+    let any = false, wet = false;
+    for (let j = from; j < from + hours && j < x.p.length; j++) { if (x.p[j] != null) any = true; if (isWet(x.pp?.[j], x.p[j])) wet = true; }
+    if (!any) continue;
+    n++; if (wet) m++;
+  }
+  return n ? { n, m } : null;
+}
+
+/** 주 예보(화면 기본 예보)의 출처 키: 기상청 덮어쓰기 → kma, MET 대체 → met, 그 밖 Open-Meteo 최적 모델 → om */
+export function primarySrc(res) { return res?.kmaBase ? "kma" : res?.src === "met" ? "met" : "om"; }
+/** 구름 층(높은·중간·낮은) 출처 — 기상청 덮어쓰기는 구름 층을 바꾸지 않으므로 바탕 예보 */
+export function cloudSrc(res) { return res?.src === "met" ? "met" : "om"; }
+
 /** 도시 하나의 화면 값 */
 export function buildVM(city, res, air, models) {
   const wx = res.wx, H = wx.hourly, D = wx.daily || {};
@@ -44,6 +63,7 @@ export function buildVM(city, res, air, models) {
   const r48 = rainOutlook(H, i, 48);
   const cm = modelsForConsensus(models, H);
   const cons = cm.length >= 2 ? consensusFor(cm, i, 24, undefined, H.time) : null;
+  const agency = agencyCount(cm, i, 24);
   let sum = null;
   try { sum = summary(wx, { now, air: air ? { pm10: air.pm10, pm25: air.pm25 } : undefined }); } catch (e) { console.warn(e); }
   const strip = [];
@@ -52,7 +72,7 @@ export function buildVM(city, res, air, models) {
     strip.push({ time: H.time[j], temp: H.temperature_2m?.[j], icon: iconKey(H.weather_code?.[j], isDayAt(H, D, j), H.precipitation?.[j], H.wind_speed_10m?.[j]), wet: isWet(H.precipitation_probability?.[j], H.precipitation?.[j]) });
   }
   return {
-    city, res, wx, H, D, now, i, today, di, curT, curA, code, day, ik, moon, r24, r48, cons, consModels: cm, sum, strip, air,
+    city, res, wx, H, D, now, i, today, di, curT, curA, code, day, ik, moon, r24, r48, cons, agency, consModels: cm, sum, strip, air,
     airG: air ? airGrade(air.pm10, air.pm25) : null,
     tmax: D.temperature_2m_max?.[di], tmin: D.temperature_2m_min?.[di],
     windMs, hum: C.relative_humidity_2m ?? H.relative_humidity_2m?.[i],

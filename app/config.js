@@ -19,6 +19,9 @@ export const DEFAULT_FLAGS = Object.freeze({
   maps: false,
   push: false,
   quakes: false,
+  // SPEC 11 — 우리 예측(합의 확률·보정 강수량·노을/무지개 판정·오로라 지수) 화면 표시.
+  // 기상예보업 등록 전까지 off: 기관 예보를 출처와 함께 그대로, 판정 대신 「조건」만 보여 준다.
+  own_forecast: false,
 });
 
 export const MAX_CITIES = 5;
