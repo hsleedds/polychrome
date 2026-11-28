@@ -1,0 +1,699 @@
+{
+  "version": "0.1.0",
+  "license": "Polychrome proprietary — not derived from OSM/Overture",
+  "conventions": "Local metres: x = east, y = north relative to the landmark origin (lat, lon), heights relative to baseM (m above sea level). Part azDeg rotates the part's local frame clockwise so that local +y points to azDeg. Values marked est are modelling estimates, not published figures. Coordinates from Wikipedia/Structurae (not OSM/Overture). Geometry hand-built from published dimensions only; nothing traced from photos, drawings or 3D models. See core/landmark-core.js header for primitive definitions.",
+  "landmarks": [
+    {
+      "id": "lotte-world-tower",
+      "name": {"ko": "롯데월드타워", "en": "Lotte World Tower"},
+      "aliases": ["롯데타워", "잠실 롯데타워", "Lotte Tower", "LWT"],
+      "lat": 37.5125,
+      "lon": 127.1028,
+      "baseM": 18,
+      "baseEst": true,
+      "baseReason": "Jamsil site ground level ~15-20 m ASL; no official figure found",
+      "kind": "tower",
+      "heights": {"architecturalM": 554.5, "tipM": 555.7, "observatoryM": 497.6, "skyBridgeM": 541},
+      "parts": [
+        {
+          "type": "prism",
+          "label": "lower shaft (70 m square)",
+          "rect": [70, 70],
+          "bottomM": 0,
+          "topM": 180,
+          "est": true,
+          "estFields": ["topM", "azDeg"],
+          "estReason": "taper start ~1/3 height (floor 42) per ENR; floor-42 height ~180 m estimated; plan rotation not published (0 used)"
+        },
+        {
+          "type": "prism",
+          "label": "tapering mid shaft",
+          "rect": [70, 70],
+          "topRect": [40, 40],
+          "bottomM": 180,
+          "topM": 435,
+          "est": true,
+          "estFields": ["topRect", "topM"],
+          "estReason": "top-of-office width and lantern start (~floor 107) estimated; continuous curved taper approximated by a frustum"
+        },
+        {
+          "type": "prism",
+          "label": "lantern crown",
+          "rect": [40, 40],
+          "topRect": [12, 12],
+          "bottomM": 435,
+          "topM": 554.5,
+          "est": true,
+          "estFields": ["rect", "topRect", "bottomM"],
+          "estReason": "lantern (roof structure ~120 m tall, floors 107-123 per Wikipedia) widths estimated"
+        },
+        {
+          "type": "pylon",
+          "label": "tip mast",
+          "radius": 1,
+          "bottomM": 554.5,
+          "topM": 555.7,
+          "est": true,
+          "estFields": ["radius"],
+          "estReason": "mast thickness not published"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://wikiwand.com/en/Lotte_World_Tower",
+          "fields": ["lat", "lon", "tipM(555)", "skyBridgeM", "lantern roof structure 120 m / floors 107-123"]
+        },
+        {
+          "url": "https://www.skyscrapercenter.com/building/lotte-world-tower/88",
+          "fields": ["heights.architecturalM", "heights.tipM", "heights.observatoryM"]
+        },
+        {
+          "url": "https://enr.com/articles/153-lotte-korea-s-first-supertower-is-an-all-in-the-family-affair",
+          "fields": ["parts[0].rect (70 m square plan)", "taper starts ~1/3 up, slopes from floor 42"]
+        }
+      ],
+      "notes": "Square plan 70 m tapering to the lantern. Real tower has curved seams/notches (1 m at base to 10 m at top per ENR) — ignored; frustum approximation is within a few metres of the outline at Seoul viewing distances."
+    },
+    {
+      "id": "n-seoul-tower",
+      "name": {"ko": "N서울타워", "en": "N Seoul Tower"},
+      "aliases": ["남산타워", "남산서울타워", "서울타워", "Namsan Tower", "Seoul Tower"],
+      "lat": 37.551216,
+      "lon": 126.988276,
+      "baseM": 243,
+      "baseEst": false,
+      "baseReason": "operator: overall 480 m ASL, tower 237 m, rises 243 m above summit area; Structurae: 479.7 m ASL top, 236.7 m tower → base ≈ 243 m",
+      "kind": "tower",
+      "heights": {"towerM": 236.7, "topAslM": 479.7, "observatoryM": 135.6},
+      "parts": [
+        {
+          "type": "lathe",
+          "label": "concrete shaft + observatory pod + antenna",
+          "segments": 24,
+          "profile": [[0, 9], [10, 6.5], [118, 4.5], [121, 11], [126, 14], [150, 14], [154, 8], [158, 4], [160, 1.6], [236.7, 0.4]],
+          "est": true,
+          "estFields": ["profile radii", "pod/antenna break heights"],
+          "estReason": "only total height (236.7 m) and observatory height (~135.6 m) are published; radii and section heights are estimates"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/N_Seoul_Tower",
+          "fields": ["lat", "lon"]
+        },
+        {
+          "url": "https://seoulytn.ytn.co.kr/en/intro/brand",
+          "fields": ["heights.towerM (237)", "overall 480 m ASL", "baseM (via 480-237)"]
+        },
+        {
+          "url": "https://structurae.net/en/structures/n-seoul-tower",
+          "fields": ["heights.towerM (236.7)", "heights.topAslM (479.7)", "observation deck 136 m"]
+        },
+        {
+          "url": "https://www.skyscrapercenter.com/building/id/9617",
+          "fields": ["heights.observatoryM (135.6)", "tip 236.8"]
+        }
+      ],
+      "notes": "baseM is the tower foot on Namsan (not the 270 m summit benchmark). Heights relative to baseM."
+    },
+    {
+      "id": "63-square",
+      "name": {"ko": "63스퀘어", "en": "63 Square (63 Building)"},
+      "aliases": ["63빌딩", "63 빌딩", "63 Building", "63시티"],
+      "lat": 37.5193778,
+      "lon": 126.9402111,
+      "baseM": 14.4,
+      "baseEst": true,
+      "baseReason": "derived: 264 m ASL roof (itwiki) − 249.6 m roof height; secondary source",
+      "kind": "building",
+      "heights": {"roofM": 249.6, "antennaM": 274, "topFloorM": 240},
+      "parts": [
+        {
+          "type": "prism",
+          "label": "tower body (sloped sides)",
+          "rect": [60, 28],
+          "topRect": [34, 20],
+          "bottomM": 0,
+          "topM": 249.6,
+          "azDeg": 70,
+          "est": true,
+          "estFields": ["rect", "topRect", "azDeg"],
+          "estReason": "plan dimensions and orientation not published; trapezoidal elevation approximated by a frustum"
+        },
+        {
+          "type": "pylon",
+          "label": "antenna",
+          "radius": 0.8,
+          "bottomM": 249.6,
+          "topM": 274,
+          "est": true,
+          "estFields": ["radius"],
+          "estReason": "antenna thickness not published"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/63_Building",
+          "fields": ["heights.roofM", "heights.antennaM", "heights.topFloorM"]
+        },
+        {
+          "url": "https://itwiki.kr/w/63빌딩",
+          "fields": ["lat", "lon", "roof 264 m ASL (→ baseM)"]
+        }
+      ],
+      "notes": "Orientation (azDeg) is a placeholder estimate — verify against an orthophoto (not OSM) before relying on width-sensitive alignments."
+    },
+    {
+      "id": "parc1",
+      "name": {"ko": "파크원", "en": "Parc.1"},
+      "aliases": ["파크원 타워", "Parc1", "Parc 1", "더현대 서울", "Parc1 Tower"],
+      "lat": 37.526094,
+      "lon": 126.928197,
+      "baseM": 12,
+      "baseEst": true,
+      "baseReason": "Yeouido ground ~10-14 m ASL; no official figure found",
+      "kind": "building",
+      "heights": {"tower1M": 333, "tower1RoofM": 318, "tower2M": 256, "ctbuhTower1M": 322, "ctbuhTower2M": 247.1},
+      "parts": [
+        {
+          "type": "prism",
+          "label": "Tower 1 body",
+          "rect": [52, 38],
+          "center": [-70, 40],
+          "bottomM": 0,
+          "topM": 318,
+          "est": true,
+          "estFields": ["rect", "center"],
+          "estReason": "plan size and position within the site not published"
+        },
+        {
+          "type": "prism",
+          "label": "Tower 1 red frame crown",
+          "rect": [52, 38],
+          "center": [-70, 40],
+          "bottomM": 318,
+          "topM": 333,
+          "est": true,
+          "estFields": ["rect", "center"],
+          "estReason": "frame is open; modelled as solid crown"
+        },
+        {
+          "type": "prism",
+          "label": "Tower 2",
+          "rect": [50, 36],
+          "center": [80, -50],
+          "bottomM": 0,
+          "topM": 256,
+          "est": true,
+          "estFields": ["rect", "center"],
+          "estReason": "plan size and position within the site not published"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://wikiwand.com/EN/Parc1_Tower",
+          "fields": ["lat", "lon", "heights.tower1M", "heights.tower1RoofM"]
+        },
+        {
+          "url": "https://wikiwand.com/en/articles/List_of_tallest_buildings_in_Seoul",
+          "fields": ["heights.tower2M (256 m, 53 fl)"]
+        },
+        {
+          "url": "https://www.skyscrapercenter.com/building/parc1-tower-i/366",
+          "fields": ["heights.ctbuhTower1M"]
+        },
+        {
+          "url": "https://www.skyscrapercenter.com/building/parc1-tower-ii/672",
+          "fields": ["heights.ctbuhTower2M"]
+        }
+      ],
+      "notes": "Height conflict: Wikipedia/TK Elevator 333 m vs CTBUH 322 m (Tower 1), 256 m vs 247.1 m (Tower 2). Model uses the larger figures. Tower positions/plan sizes are placeholders."
+    },
+    {
+      "id": "national-assembly",
+      "name": {"ko": "국회의사당", "en": "National Assembly Proceeding Hall"},
+      "aliases": ["국회", "국회 본관", "National Assembly", "Korea National Assembly Building"],
+      "lat": 37.5320028,
+      "lon": 126.9140722,
+      "baseM": 12,
+      "baseEst": true,
+      "baseReason": "Yeouido ground ~10-14 m ASL",
+      "kind": "dome-building",
+      "heights": {"plinthM": 5.44, "colonnadeM": 32.5, "domeTopM": 69.19, "domeDiameterM": 64},
+      "parts": [
+        {
+          "type": "prism",
+          "label": "plinth (기단)",
+          "rect": [130, 89],
+          "bottomM": 0,
+          "topM": 5.44,
+          "azDeg": 0,
+          "est": true,
+          "estFields": ["rect", "azDeg"],
+          "estReason": "plinth footprint assumed 4 m beyond the 122 × 81 m body"
+        },
+        {
+          "type": "prism",
+          "label": "main body 122 × 81 m",
+          "rect": [122, 81],
+          "bottomM": 5.44,
+          "topM": 40,
+          "azDeg": 0,
+          "est": true,
+          "estFields": ["topM", "azDeg"],
+          "estReason": "roof = plinth 5.44 + 32.5 m colonnade + ~2 m entablature (est); long axis E-W assumed"
+        },
+        {
+          "type": "lathe",
+          "label": "dome drum",
+          "segments": 24,
+          "profile": [[40, 32], [47, 32]],
+          "est": true,
+          "estFields": ["profile heights"],
+          "estReason": "drum height not published"
+        },
+        {
+          "type": "dome",
+          "label": "dome",
+          "center": [0, 0],
+          "radius": 32,
+          "springM": 47,
+          "riseM": 22.19,
+          "est": true,
+          "estFields": ["springM", "riseM"],
+          "estReason": "dome diameter 64 m and top 69.19 m (5.44 + 63.75) are published; spring height estimated"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/National_Assembly_Building_(South_Korea)",
+          "fields": ["lat", "lon"]
+        },
+        {
+          "url": "https://theme.archives.go.kr/next/koreaOfRecord/parliamentBldg.do",
+          "fields": ["parts[1].rect (length 122 m, width 81 m)", "heights.domeDiameterM"]
+        },
+        {
+          "url": "https://encykorea.aks.ac.kr/Article/E0006572",
+          "fields": ["heights.plinthM", "heights.colonnadeM", "heights.domeTopM (5.44 + 63.75)", "heights.domeDiameterM"]
+        }
+      ],
+      "notes": "Facade orientation not published in the sources used; azDeg 0 (long axis E-W) is an estimate."
+    },
+    {
+      "id": "gwanghwamun",
+      "name": {"ko": "광화문", "en": "Gwanghwamun Gate"},
+      "aliases": ["광화문 문루", "Gwanghwamun"],
+      "lat": 37.576,
+      "lon": 126.977,
+      "baseM": 36,
+      "baseEst": true,
+      "baseReason": "Gwanghwamun area ground ~33-38 m ASL",
+      "kind": "gate",
+      "heights": {"stoneBaseM": 7, "ridgeM": 19.5, "ridgeEst": true},
+      "parts": [
+        {
+          "type": "prism",
+          "label": "stone base (육축) with 3 arches",
+          "rect": [34, 14],
+          "bottomM": 0,
+          "topM": 7,
+          "est": true,
+          "estFields": ["rect"],
+          "estReason": "base height 7 m published; footprint estimated"
+        },
+        {
+          "type": "prism",
+          "label": "lower storey (정면 3칸 77척 × 측면 2칸 20척)",
+          "rect": [23.8, 6.2],
+          "bottomM": 7,
+          "topM": 11,
+          "est": true,
+          "estFields": ["topM", "rect (척→m at ~0.309 m)"],
+          "estReason": "bay widths published in 척; conversion and storey height estimated"
+        },
+        {
+          "type": "roof",
+          "label": "lower (pent) roof",
+          "rect": [29, 12],
+          "eaveM": 10.5,
+          "ridgeM": 13,
+          "ridgeLen": 22,
+          "est": true,
+          "estFields": ["rect", "eaveM", "ridgeM", "ridgeLen"],
+          "estReason": "roof dimensions not published"
+        },
+        {
+          "type": "prism",
+          "label": "upper storey",
+          "rect": [21, 5],
+          "bottomM": 13,
+          "topM": 15.5,
+          "est": true,
+          "estFields": ["rect", "bottomM", "topM"],
+          "estReason": "not published"
+        },
+        {
+          "type": "roof",
+          "label": "upper hip roof (우진각)",
+          "rect": [28, 11],
+          "eaveM": 15,
+          "ridgeM": 19.5,
+          "ridgeLen": 13,
+          "est": true,
+          "estFields": ["rect", "eaveM", "ridgeM", "ridgeLen"],
+          "estReason": "roof dimensions not published"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://wikiwand.com/en/articles/Gwanghwamun",
+          "fields": ["lat", "lon"]
+        },
+        {
+          "url": "https://seoul.co.kr/news/life/2010/08/14/20100814012012",
+          "fields": ["heights.stoneBaseM (7 m)", "floor areas 174.1/110.7 m²", "rotation 3.75° restored to palace axis"]
+        },
+        {
+          "url": "https://encykorea.aks.ac.kr/Article/E0002439",
+          "fields": ["bays 3×2", "bay spacing 25/27/25 척, side 10 척", "hip roof"]
+        }
+      ],
+      "notes": "Gate faces south; long axis E-W. Upper ridge height is an estimate. Coordinates only to ~10 m (Wikipedia 4 decimals)."
+    },
+    {
+      "id": "sungnyemun",
+      "name": {"ko": "숭례문", "en": "Sungnyemun (Namdaemun)"},
+      "aliases": ["남대문", "Namdaemun", "Sungnyemun Gate"],
+      "lat": 37.559964,
+      "lon": 126.975311,
+      "baseM": 27,
+      "baseEst": true,
+      "baseReason": "Namdaemun-ro ground ~25-30 m ASL",
+      "kind": "gate",
+      "heights": {"upperRidgeLenM": 16.8, "ridgeM": 20.5, "ridgeEst": true},
+      "parts": [
+        {
+          "type": "prism",
+          "label": "stone base with arch",
+          "rect": [30, 17],
+          "bottomM": 0,
+          "topM": 7,
+          "est": true,
+          "estFields": ["rect", "topM"],
+          "estReason": "base dimensions not published in sources used"
+        },
+        {
+          "type": "prism",
+          "label": "lower storey (정면 5칸 × 측면 2칸)",
+          "rect": [24.5, 8],
+          "bottomM": 7,
+          "topM": 11,
+          "est": true,
+          "estFields": ["rect", "topM"],
+          "estReason": "not published"
+        },
+        {
+          "type": "roof",
+          "label": "lower (pent) roof",
+          "rect": [30, 14],
+          "eaveM": 10.5,
+          "ridgeM": 13.5,
+          "ridgeLen": 24,
+          "est": true,
+          "estFields": ["rect", "eaveM", "ridgeM", "ridgeLen"],
+          "estReason": "not published"
+        },
+        {
+          "type": "prism",
+          "label": "upper storey",
+          "rect": [22, 6.5],
+          "bottomM": 13.5,
+          "topM": 16,
+          "est": true,
+          "estFields": ["rect", "bottomM", "topM"],
+          "estReason": "not published"
+        },
+        {
+          "type": "roof",
+          "label": "upper hip roof (우진각)",
+          "rect": [30, 13.5],
+          "eaveM": 15.5,
+          "ridgeM": 20.5,
+          "ridgeLen": 16.8,
+          "est": true,
+          "estFields": ["rect", "eaveM", "ridgeM"],
+          "estReason": "ridge length 16.8 m published (2013 restoration); other roof figures estimated"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://structurae.net/en/structures/sungnyemun",
+          "fields": ["lat", "lon"]
+        },
+        {
+          "url": "https://www.newdaily.co.kr/site/data/html/2013/04/29/2013042900094.amp.html",
+          "fields": ["parts[4].ridgeLen (16.8 m)", "ground lowered 0.3-0.5 m"]
+        },
+        {
+          "url": "https://encykorea.aks.ac.kr/Article/E0028017",
+          "fields": ["bays 5×2", "2-storey, hip roof"]
+        }
+      ],
+      "notes": "Faces south; long axis E-W. Most dimensions estimated — a 실측 report (『숭례문 정밀실측조사보고서』, 2006) would give exact figures if obtainable."
+    },
+    {
+      "id": "banpo-bridge",
+      "name": {"ko": "반포대교", "en": "Banpo Bridge"},
+      "aliases": ["반포대교·잠수교", "잠수교", "Jamsu Bridge", "Banpo Bridge"],
+      "lat": 37.515556,
+      "lon": 126.996139,
+      "baseM": 2.5,
+      "baseEst": true,
+      "baseReason": "Han River normal pool level below Jamsil weir ≈ EL 2.5 m",
+      "kind": "bridge",
+      "heights": {
+        "lengthM": 1495,
+        "widthM": 25,
+        "jamsuLengthM": 795,
+        "jamsuWidthM": 18,
+        "jamsuDeckAboveWaterM": 2,
+        "upperDeckAboveWaterM": 20
+      },
+      "parts": [
+        {
+          "type": "deck",
+          "label": "Banpo upper deck",
+          "azDeg": 170,
+          "points": [[0, -747.5], [0, 747.5]],
+          "width": 25,
+          "topM": 20,
+          "bottomM": 17,
+          "piers": {
+            "spacingM": 45,
+            "size": [3, 14]
+          },
+          "est": true,
+          "estFields": ["azDeg", "topM", "bottomM", "piers"],
+          "estReason": "axis azimuth not published (N-S crossing Seobinggo→Banpo, ~170° est); deck height from fountain 'falls 20 m to the river'; girder depth/pier spacing est"
+        },
+        {
+          "type": "deck",
+          "label": "Jamsu lower deck",
+          "azDeg": 170,
+          "points": [[0, -397.5], [0, 397.5]],
+          "width": 18,
+          "topM": 2,
+          "bottomM": 0.5,
+          "piers": {
+            "spacingM": 15,
+            "size": [1.5, 12]
+          },
+          "est": true,
+          "estFields": ["azDeg", "bottomM", "position along axis"],
+          "estReason": "~2 m above normal water and 15 m pier spacing published; centring under Banpo estimated; 1986 raised middle section ignored"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Banpo_Bridge",
+          "fields": ["heights.lengthM (1495)", "heights.widthM", "double deck"]
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/List_of_bridges_in_South_Korea",
+          "fields": ["lat", "lon"]
+        },
+        {
+          "url": "https://encykorea.aks.ac.kr/Article/E0048181",
+          "fields": ["heights.jamsuLengthM", "heights.jamsuWidthM"]
+        },
+        {
+          "url": "https://www.cerik.re.kr/board/debate/1410",
+          "fields": ["heights.jamsuDeckAboveWaterM (~2 m)", "Jamsu pier spacing 15 m", "Banpo 1, 490 m / 25 m"]
+        },
+        {
+          "url": "https://mediahub.seoul.go.kr/archives/2002598",
+          "fields": ["heights.upperDeckAboveWaterM (fountain falls 20 m to the river)"]
+        }
+      ],
+      "notes": "Length 1, 495 m (Wikipedia) vs 1, 490 m (CERIK) — 1, 495 used."
+    },
+    {
+      "id": "dongjak-bridge",
+      "name": {"ko": "동작대교", "en": "Dongjak Bridge"},
+      "aliases": ["Dongjak Bridge", "동작대교 아치"],
+      "lat": 37.510864,
+      "lon": 126.981847,
+      "baseM": 2.5,
+      "baseEst": true,
+      "baseReason": "Han River normal pool level below Jamsil weir ≈ EL 2.5 m",
+      "kind": "bridge",
+      "heights": {"lengthM": 1330, "widthM": 40, "roadWidthM": 28.6, "railWidthM": 11.4, "maxSpanM": 80},
+      "parts": [
+        {
+          "type": "deck",
+          "label": "road + rail deck",
+          "azDeg": 178,
+          "points": [[0, -665], [0, 665]],
+          "width": 40,
+          "topM": 14,
+          "bottomM": 11,
+          "piers": {
+            "spacingM": 50,
+            "size": [3, 16]
+          },
+          "est": true,
+          "estFields": ["azDeg", "topM", "bottomM", "piers"],
+          "estReason": "axis azimuth, deck height and pier spacing not published"
+        },
+        {
+          "type": "arch",
+          "label": "Langer arch 1",
+          "azDeg": 178,
+          "from": [0, -120],
+          "to": [0, -40],
+          "springM": 14,
+          "riseM": 12,
+          "thickness": 1.6,
+          "width": 11.4,
+          "est": true,
+          "estFields": ["riseM", "from", "to", "count"],
+          "estReason": "80 m max span and Langer-arch rail bridge published; arch count (3), positions and rise (~1/6.7 span) estimated"
+        },
+        {
+          "type": "arch",
+          "label": "Langer arch 2",
+          "azDeg": 178,
+          "from": [0, -40],
+          "to": [0, 40],
+          "springM": 14,
+          "riseM": 12,
+          "thickness": 1.6,
+          "width": 11.4,
+          "est": true,
+          "estFields": ["riseM", "from", "to"],
+          "estReason": "see arch 1"
+        },
+        {
+          "type": "arch",
+          "label": "Langer arch 3",
+          "azDeg": 178,
+          "from": [0, 40],
+          "to": [0, 120],
+          "springM": 14,
+          "riseM": 12,
+          "thickness": 1.6,
+          "width": 11.4,
+          "est": true,
+          "estFields": ["riseM", "from", "to"],
+          "estReason": "see arch 1"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://structurae.net/structures/dongjak-grand-bridge",
+          "fields": ["lat", "lon", "heights.lengthM", "heights.widthM", "heights.maxSpanM"]
+        },
+        {
+          "url": "https://encykorea.aks.ac.kr/Article/E0016754",
+          "fields": ["heights.lengthM", "heights.roadWidthM", "heights.railWidthM", "heights.maxSpanM", "Langer arch on central rail spans"]
+        }
+      ],
+      "notes": "Wikipedia's list gives 2, 047 m (includes approaches); main bridge 1, 330 m used. Arch count/rise must be verified visually."
+    },
+    {
+      "id": "jamsil-cheongdam-bridges",
+      "name": {"ko": "잠실대교·청담대교", "en": "Jamsil & Cheongdam Bridges"},
+      "aliases": ["잠실대교", "청담대교", "Jamsil Bridge", "Cheongdam Bridge"],
+      "lat": 37.525861,
+      "lon": 127.064222,
+      "baseM": 2.5,
+      "baseEst": true,
+      "baseReason": "Han River normal pool ≈ EL 2.5 m; Jamsil Bridge may sit by the Jamsil weir pool (higher) — not modelled",
+      "kind": "bridge",
+      "heights": {"cheongdamLengthM": 1211, "cheongdamWidthM": 27, "jamsilLengthM": 1280, "jamsilWidthM": 25, "jamsilPiers": 31},
+      "parts": [
+        {
+          "type": "deck",
+          "label": "Cheongdam lower deck (Line 7)",
+          "azDeg": 195,
+          "points": [[0, -605.5], [0, 605.5]],
+          "width": 11,
+          "topM": 12,
+          "bottomM": 9,
+          "piers": {
+            "spacingM": 60,
+            "size": [3, 14]
+          },
+          "est": true,
+          "estFields": ["azDeg", "width", "topM", "bottomM", "piers"],
+          "estReason": "double-deck (lower rail, upper road) published; deck heights, rail deck width, pier spacing and axis estimated"
+        },
+        {
+          "type": "deck",
+          "label": "Cheongdam upper road deck",
+          "azDeg": 195,
+          "points": [[0, -605.5], [0, 605.5]],
+          "width": 27,
+          "topM": 21,
+          "bottomM": 18,
+          "est": true,
+          "estFields": ["azDeg", "topM", "bottomM"],
+          "estReason": "deck heights estimated"
+        },
+        {
+          "type": "deck",
+          "label": "Jamsil Bridge deck",
+          "at": {"lat": 37.524306, "lon": 127.091639},
+          "azDeg": 165,
+          "points": [[0, -640], [0, 640]],
+          "width": 25,
+          "topM": 11,
+          "bottomM": 8.5,
+          "piers": {
+            "spacingM": 40,
+            "size": [2.5, 12]
+          },
+          "est": true,
+          "estFields": ["azDeg", "topM", "bottomM"],
+          "estReason": "length/width/31 piers published (spacing = 1280/32); deck height and axis estimated"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/List_of_bridges_in_South_Korea",
+          "fields": ["lat", "lon", "parts[2].at"]
+        },
+        {
+          "url": "https://encykorea.aks.ac.kr/Article/E0068491",
+          "fields": ["heights.cheongdamLengthM", "heights.cheongdamWidthM", "double-deck: lower Line 7, upper road"]
+        },
+        {
+          "url": "https://encykorea.aks.ac.kr/Article/E0048183",
+          "fields": ["heights.jamsilLengthM", "heights.jamsilWidthM", "heights.jamsilPiers"]
+        }
+      ],
+      "notes": "Two bridges ~2.4 km apart in one entry; origin = Cheongdam Bridge, Jamsil Bridge parts use their own 'at' origin."
+    }
+  ]
+}

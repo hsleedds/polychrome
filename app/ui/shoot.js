@@ -1,4 +1,4 @@
-/* 출사 탭: 메뉴 + 준비 중 화면 (오로라는 aurora.js) */
+/* 출사 탭: 메뉴 + 준비 중 화면 (오로라는 aurora.js, 실루엣 미리보기는 silhouette.js) */
 import { t, cityName } from "../i18n.js";
 import { esc, header } from "./dom.js";
 import { icon } from "../icons.js";
@@ -13,17 +13,17 @@ export const SHOOT_ITEMS = [
   { key: "forecast", icon: "camera" },
   { key: "line", icon: "line" },
   { key: "dates", icon: "calendar" },
-  { key: "silhouette", icon: "silhouette" },
+  { key: "silhouette", icon: "silhouette", live: true },
   { key: "view", icon: "mountain" },
-  { key: "aurora", icon: "aurora", href: "#/aurora" },
+  { key: "aurora", icon: "aurora", href: "#/aurora", live: true },
   { key: "drone", icon: "drone" },
   { key: "quake", icon: "volcano" },
 ];
 
 export function renderShootMenu(root) {
-  root.innerHTML = header(t("tab.shoot"), { back: false }) + `<div class="pad"><ul class="menu">${SHOOT_ITEMS.map((it) => `<li><a class="menu-row${it.key === "aurora" ? " live" : ""}" href="${it.href || "#/shoot/" + it.key}">
+  root.innerHTML = header(t("tab.shoot"), { back: false }) + `<div class="pad"><ul class="menu">${SHOOT_ITEMS.map((it) => `<li><a class="menu-row${it.live ? " live" : ""}" href="${it.href || "#/shoot/" + it.key}">
       <span class="menu-ic">${icon(it.icon, { cls: "md" })}</span><span class="menu-t"><b>${esc(t("shoot." + it.key))}</b><small>${esc(t(descKey(it.key)))}</small></span>
-      ${it.key === "aurora" ? "" : `<span class="chip">${esc(t("soon"))}</span>`}${icon("chevron", { cls: "sm" })}</a></li>`).join("")}</ul></div>`;
+      ${it.live ? "" : `<span class="chip">${esc(t("soon"))}</span>`}${icon("chevron", { cls: "sm" })}</a></li>`).join("")}</ul></div>`;
 }
 
 /** 무지개 해 고도 조건 문장 (천문 계산 — 예보 아님) */

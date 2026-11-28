@@ -53,3 +53,20 @@
 - 은하수: `galacticCenter(date, lat, lon)` → `{az, alt}`; `milkyWayWindow(ymd, lat, lon, tz)` → `{start, end, coreRise, coreSet}|null`.
 - `METEOR_SHOWERS` 배열 `{key, peak:'MM-DD', zhr, radiant:{ra,dec}}`.
 - 무지개: `rainbowPossible(sunAlt)` (42° 미만), `rainbowAz(sunAz)`.
+
+## landmark-core.js v0.1.0 (전역 `LandmarkCore`, SkyCore 필요)
+- `setLibrary(json)` (브라우저는 `data/landmarks.json` fetch 후 주입, Node 자동 로드), `library()`, `list()` → `[{id,name,kind,lat,lon}]`
+- `findLandmark(query)` → landmark|null (id / name.ko / name.en / aliases, 공백·구두점 무시)
+- `toMesh(landmark)` → `{vertices:[[e,n,z]], triangles, edges, parts, baseM, origin}` (지역 ENU m, z는 baseM 기준, lathe 24분할)
+- `silhouette(landmark|id, {lat, lon, groundM, eyeM=1.6, refraction=0.13}, {columns=120})` → `{id, polygons:[[[az,alt],...]], top:{az,alt}, base:{az,alt}, distKm, bearingDeg, angularWidthDeg, angularHeightDeg, azRange, altRange, envelope}` — 볼록 조각 hull 합 + 열 샘플링 윗선. polygons/azRange/envelope의 az는 bearingDeg±180으로 펼친 값, top/base.az는 0..360.
+- `occlusion(sil, {az, alt|altApparent, diamDeg})` → `{state:'clear'|'partial'|'behind', coveredFrac}`
+- `validate(json)` → 오류 문자열 배열 (출처·수치·est 사유·OSM 출처 금지)
+- 부품: lathe, prism, pylon, dome, roof, deck, arch (공통 at{lat,lon}, azDeg, dzM). 데이터 규칙은 SPEC 13.
+
+## terrain-core.js v0.1.0 (전역 `TerrainCore`, 의존성 없음 — 곡률·굴절식은 SkyCore와 동일, 테스트로 일치 확인)
+- 공급원: `{ id, attribution, elevations([{lat,lon,resM?}]) → Promise<(number|null)[]> }`
+- `terrariumSource({zoom=12, maxTiles=64, loadTile?, adaptive=true, concurrency=6})` — AWS Terrain Tiles(Terrarium), 쌍선형, LRU, 거리별 줌 자동. 출처 문구 `attribution`(화면 표시 필수).
+- `syntheticSource(fn)` (테스트용)
+- `horizonProfile(source, {lat, lon, eyeM=1.6, groundM?, maxKm=40, stepDeg=1, refraction=0.13})` → `{az, alt, distKm, groundM, eyeM, stepDeg, maxKm, samples, attribution}` — 방위당 268점(30m~, 1.5% 증가), 1°면 약 9.6만 점 한 번에 요청. alt는 바다 지평선 내림각 아래로 안 내려감.
+- `horizonAt(p, az)`, `isBlocked(p, az, alt, radiusDeg)` → 'clear'|'partial'|'blocked', `firstVisible(p, track)` / `lastVisible(p, track)` → `{touch, clear}`
+- 한계: 표면 모델(DSM)이라 숲·건물 포함, 먼 지형은 거친 줌으로 약간 낮게, 굴절 고정.

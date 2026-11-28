@@ -10,6 +10,7 @@ import { renderSearch } from "./ui/search.js";
 import { renderSettings } from "./ui/settings.js";
 import { renderShootMenu, renderShootPlaceholder } from "./ui/shoot.js";
 import { renderAuroraList, renderAuroraDetail } from "./ui/aurora.js";
+import { renderSilhouette } from "./ui/silhouette.js";
 import { renderAccuracy } from "./ui/admin.js";
 import { toast } from "./ui/dom.js";
 import { icon } from "./icons.js";
@@ -85,6 +86,7 @@ function render() {
     else if (top === "city" && parts[1]) renderDetail(el, ctx, parts[1], parts[2] === "day" ? parts[3] : null);
     else if (top === "add") renderSearch(el, ctx, parts[1] === "aurora" ? "aurora" : "weather");
     else if (top === "settings") renderSettings(el, ctx);
+    else if (top === "shoot" && parts[1] === "silhouette") renderSilhouette(el, ctx);
     else if (top === "shoot" && parts[1]) renderShootPlaceholder(el, ctx, parts[1]);
     else if (top === "shoot") renderShootMenu(el, ctx);
     else if (top === "aurora" && parts[1]) renderAuroraDetail(el, ctx, parts[1]);
