@@ -342,17 +342,59 @@ export async function renderSilhouette(root, ctx) {
       }
     }
     // 렌즈 화각 틀 (구조물 가운데)
-    if (P.lens) {
-      const fov = lensFov(P.lens), cAlt = (sil.altRange[0] + sil.altRange[1]) / 2;
-      const w = fov.h * k, h = fov.v * k, cx = V.x(sil.bearingDeg), cy = V.y(cAlt);
-      parts.push(`<rect x="${f1(cx - w / 2)}" y="${f1(cy - h / 2)}" width="${f1(w)}" height="${f1(h)}" class="sil-lens"/>`);
-      const ty = Math.max(40, cy - h / 2 + 36), tx = Math.max(16, cx - w / 2 + 12);
-      parts.push(`<text x="${f1(Math.min(tx, W - 160))}" y="${f1(Math.min(ty, H - 50))}" class="sil-lens-t">${P.lens} mm</text>`);
-    }
-    parts.push(`<g class="sil-dyn"></g></g>`);
+    parts.push(`<g class="sil-dyn"></g><g class="sil-lensg"></g></g>`); // 화각 틀·바깥 어둡게는 맨 위
     const title = t("sil.chartA11y", { lm: lmName(lm), body: t("sil." + P.body), date: P.date });
     chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="sil-svg-t" preserveAspectRatio="xMidYMid meet"><title id="sil-svg-t">${esc(title)}</title>${parts.join("")}</svg>`;
+    drawLens();
   }
+
+  /* ---- 렌즈 화각 틀: 끌어서 상하좌우 이동, 틀 밖은 70% 검정 (HS 2026-11-28) ---- */
+  let lensOff = { az: 0, alt: 0 }; // 기본 위치(구조물 중심)에서 옮긴 각도
+  function lensGeom() {
+    if (!P.lens || !M || !V) return null;
+    const sil = M.sil, fov = lensFov(P.lens), k = V.k;
+    const cAlt0 = (sil.altRange[0] + sil.altRange[1]) / 2;
+    const w = fov.h * k, h = fov.v * k;
+    let cx = V.x(sil.bearingDeg + lensOff.az), cy = V.y(cAlt0 + lensOff.alt);
+    // 틀 중심은 차트 안에 머물게
+    const cx2 = Math.min(W, Math.max(0, cx)), cy2 = Math.min(H, Math.max(0, cy));
+    if (cx2 !== cx) lensOff.az += (cx2 - cx) / k;
+    if (cy2 !== cy) lensOff.alt -= (cy2 - cy) / k;
+    return { x: cx2 - w / 2, y: cy2 - h / 2, w, h };
+  }
+  function drawLens() {
+    const g = chart.querySelector(".sil-lensg"); if (!g) return;
+    const L = lensGeom();
+    if (!L) { g.innerHTML = ""; return; }
+    const { x, y, w, h } = L;
+    const mask = `M0 0H${W}V${H}H0Z M${f1(x)} ${f1(y)}h${f1(w)}v${f1(h)}h${f1(-w)}Z`;
+    const ty = Math.max(40, y + 36), tx = Math.max(16, x + 12);
+    g.innerHTML = `<path d="${mask}" fill-rule="evenodd" class="sil-lens-shade"/>
+      <rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" class="sil-lens"/>
+      <text x="${f1(Math.min(tx, W - 160))}" y="${f1(Math.min(ty, H - 50))}" class="sil-lens-t">${P.lens} mm</text>
+      <rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" class="sil-lens-hit" aria-label="${esc(t("sil.lensDrag"))}"/>`;
+  }
+  let drag = null;
+  chart.addEventListener("pointerdown", (e) => {
+    if (!e.target.closest || !e.target.closest(".sil-lens-hit")) return;
+    const svg = chart.querySelector("svg"); if (!svg || !V) return;
+    e.preventDefault();
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, az: lensOff.az, alt: lensOff.alt, scale: W / svg.getBoundingClientRect().width };
+    try { svg.setPointerCapture(e.pointerId); } catch {}
+  });
+  chart.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    e.preventDefault();
+    const dx = (e.clientX - drag.x) * drag.scale / V.k, dy = (e.clientY - drag.y) * drag.scale / V.k;
+    lensOff = { az: drag.az + dx, alt: drag.alt - dy };
+    drawLens();
+  });
+  const endDrag = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
+  chart.addEventListener("pointerup", endDrag);
+  chart.addEventListener("pointercancel", endDrag);
+  // iOS Safari: SVG 안 요소의 touch-action 이 무시될 수 있어 틀 위 터치는 스크롤 막기
+  chart.addEventListener("touchstart", (e) => { if (e.target.closest && e.target.closest(".sil-lens-hit")) e.preventDefault(); }, { passive: false });
+  chart.addEventListener("touchmove", (e) => { if (drag) e.preventDefault(); }, { passive: false });
 
   /* ---- 시각마다 바뀌는 부분 ---- */
   function drawDynamic() {
@@ -438,6 +480,7 @@ export async function renderSilhouette(root, ctx) {
   /* ---- 전체 다시 계산 ---- */
   function refresh({ keepTime = false } = {}) {
     stop();
+    if (!keepTime) lensOff = { az: 0, alt: 0 };
     savePrefs(P);
     let res;
     try { res = compute(); } catch (e) { console.warn(e); res = { err: "error.render" }; }
@@ -446,7 +489,9 @@ export async function renderSilhouette(root, ctx) {
     drawStatic(); // 창(V) 먼저 → 화면 안 구간
     M.inView = viewWindows(M.samples, V, MIN_ALT, notSet);
     // 슬라이더 범위: 화면 안 구간 (한 번도 안 들어오면 지평선 −2° 위 구간, 그것도 없으면 하루 전체)
-    const [a, b] = M.inView.length ? [M.inView[0].start, M.inView[M.inView.length - 1].end] : M.span || [M.t0, M.t1 - 60e3];
+    // 화면 안 구간이 없으면 지평선 위(능선 뒤로 진 뒤 제외) 구간, 그것도 없으면 하루 전체
+    const vis = runs(M.samples, (s) => s.alt > MIN_ALT && notSet(s));
+    const [a, b] = M.inView.length ? [M.inView[0].start, M.inView[M.inView.length - 1].end] : vis.length ? [vis[0].start, vis[vis.length - 1].end] : M.span || [M.t0, M.t1 - 60e3];
     M.range = [a, b];
     range.min = String(Math.round((a - M.t0) / 60e3)); range.max = String(Math.round((b - M.t0) / 60e3));
     range.disabled = !M.span || a === b; playBtn.disabled = range.disabled;
@@ -642,7 +687,7 @@ export async function renderSilhouette(root, ctx) {
     refresh({ keepTime: true });
   };
   for (const id of ["#sil-lat", "#sil-lon", "#sil-eye"]) $(id).addEventListener("change", onPos);
-  $("#sil-lens").addEventListener("change", (e) => { P.lens = +e.target.value || 0; savePrefs(P); if (M) { drawStatic(); drawDynamic(); } });
+  $("#sil-lens").addEventListener("change", (e) => { P.lens = +e.target.value || 0; savePrefs(P); if (M) drawLens(); });
   range.addEventListener("input", () => { if (!M) return; stop(); tMs = M.t0 + (+range.value) * 60e3; drawDynamic(); });
 
   refresh();

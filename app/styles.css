@@ -319,6 +319,8 @@ ul.plain { margin: 0; padding-left: 18px; font-size: 14px; }
 .sil-tick { fill: #fff; fill-opacity: .9; }
 .sil-hl { fill: #fff; font-size: 30px; font-weight: 700; font-family: inherit; paint-order: stroke; stroke: rgba(0,0,0,.55); stroke-width: 6px; }
 .sil-lens { fill: none; stroke: #fff; stroke-width: 3; stroke-dasharray: 18 10; stroke-opacity: .85; }
+.sil-lens-shade { fill: #000; fill-opacity: .7; pointer-events: none; }
+.sil-lens-hit { fill: transparent; cursor: move; touch-action: none; pointer-events: all; }
 .sil-lens-t { fill: #fff; font-size: 28px; font-weight: 700; font-family: inherit; paint-order: stroke; stroke: rgba(0,0,0,.5); stroke-width: 5px; }
 .sil-moon-dark { fill: #3a4157; fill-opacity: .55; }
 .sil-moon-lit { fill: #fbf3d2; }
