@@ -319,7 +319,12 @@ export function kpAt(kps, date) {
   if (!kps || !kps.length) return null;
   let v = null;
   for (const x of kps) { if (x.t.getTime() <= date.getTime()) v = x.kp; else break; }
+  // 예보 끝(마지막 3시간 구간) 뒤는 모름
+  if (date.getTime() >= kps[kps.length - 1].t.getTime() + 3 * 36e5) return null;
   return v ?? kps[0].kp;
+}
+/** NOAA Kp 예보가 끝나는 시각(ms) */
+export function kpEnd(kps) { return kps && kps.length ? kps[kps.length - 1].t.getTime() + 3 * 36e5 : null;
 }
 /** 서버 aurora 함수 (배포 전이면 null) */
 export function getAuroraServer(city) {
@@ -333,17 +338,17 @@ export function getAuroraServer(city) {
     return v;
   });
 }
-/** 구름 시간별 (오로라용, 3일) */
+/** 구름 시간별 (오로라용, 5일 — NOAA Kp 3일 예보의 마지막 밤까지 덮도록) */
 export function getClouds(city) {
-  const key = "cloud:" + ck(city);
+  const key = "cloud5:" + ck(city);
   const c = cacheGet(key, 30);
   if (c?.fresh) return Promise.resolve(c.v);
   // 날씨 도시와 같으면 그 예보를 재사용
   const wx = peekWeather(city);
-  if (wx && !wx.stale && wx.wx.hourly.cloud_cover_low) return Promise.resolve(wx.wx.hourly);
+  if (wx && !wx.stale && wx.wx.hourly.cloud_cover_low && (wx.wx.hourly.time?.length ?? 0) >= 96) return Promise.resolve(wx.wx.hourly);
   return once(key, async () => {
     try {
-      const r = await tfetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=${encodeURIComponent(city.tz)}&forecast_days=3`, {}, 10000);
+      const r = await tfetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=${encodeURIComponent(city.tz)}&forecast_days=5`, {}, 10000);
       if (r.ok) { const j = await r.json(); if (j.hourly?.time) { cachePut(key, j.hourly); return j.hourly; } }
     } catch { /* */ }
     return c ? c.v : null;

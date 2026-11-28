@@ -1,5 +1,5 @@
 /* 오로라 (SPEC 4.6): 도시 목록(별도 저장) → 상세(반원 게이지, 세 조건, 시간대별 커튼 막대 + 달 고도) */
-import { getOvation, ovationAt, getKp, kpAt, getClouds, getAuroraServer, flag, ownForecast, peekWeather } from "../data.js";
+import { getOvation, ovationAt, getKp, kpAt, kpEnd, getClouds, getAuroraServer, flag, ownForecast, peekWeather } from "../data.js";
 import { sunPos, moonPos, auroraIndex, kpToProb, magLat, twilight, hasSky, moonPhaseName, riseSet } from "../core.js";
 import { dateToLocal, hourKey, monthDay, clockAt, kpToG, ymdOf, hourLabel, pct } from "../format.js";
 import { t, cityName, lang } from "../i18n.js";
@@ -9,17 +9,37 @@ import { icon } from "../icons.js";
 
 const H = 36e5;
 
-/** 오늘 밤(또는 지금 이어지는 밤) 시간대별 지수 */
-export async function auroraNight(city) {
+/** 오로라를 볼 수 있는 밤 목록: 오늘 밤(0)부터 NOAA Kp 예보가 닿는 밤까지. [{day, ymd}] */
+export function auroraNights(city, kps) {
+  const end = kpEnd(kps), out = [{ day: 0, ymd: ymdOf(dateToLocal(new Date(), city.tz)) }];
+  if (!end) return out;
+  for (let day = 1; day <= 4; day++) {
+    const ymd = addDaysYmd(out[0].ymd, day);
+    // 그 날 저녁 18시(현지)가 예보 안이면 고를 수 있음 (밤 일부는 예보 밖일 수 있음 → 「예보 없음」으로 표시)
+    if (localNoon(ymd, city.tz) + 6 * H < end) out.push({ day, ymd }); else break;
+  }
+  return out;
+}
+const addDaysYmd = (ymd, n) => { const d = new Date(ymd + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+/** 현지 날짜 ymd 의 정오(ms, 근사: 오프셋은 그 순간 기준) */
+function localNoon(ymd, tz) {
+  const guess = Date.parse(ymd + "T12:00:00Z");
+  const off = Date.parse(dateToLocal(new Date(guess), tz).replace(" ", "T") + ":00Z") - guess; // 현지-UTC
+  return guess - (isFinite(off) ? off : 0);
+}
+
+/** 밤 시간대별 조건. day=0 오늘 밤(또는 지금 이어지는 밤), day≥1 그 날 저녁에 시작하는 밤 */
+export async function auroraNight(city, day = 0) {
   const [ov, kps, cl, srv] = await Promise.all([getOvation(), getKp(), getClouds(city), getAuroraServer(city).catch(() => null)]);
   const now = Date.now(), t0 = Math.floor(now / H) * H;
   const mlat = magLat(city.lat, city.lon);
   // 앞뒤 시간의 해 고도로 밤 구간 찾기 (해 < −6°)
+  const anchor = day > 0 ? Math.floor(localNoon(addDaysYmd(ymdOf(dateToLocal(new Date(), city.tz)), day), city.tz) / H) * H : t0;
   const span = [];
-  for (let k = -12; k <= 36; k++) { const d = new Date(t0 + k * H); span.push({ d, k, sun: sunPos(d, city.lat, city.lon).alt }); }
+  for (let k = day > 0 ? 0 : -12; k <= 36; k++) { const d = new Date(anchor + k * H); span.push({ d, k, sun: sunPos(d, city.lat, city.lon).alt }); }
   const blocks = []; let cur = null;
   for (const s of span) { if (s.sun < -6) { if (!cur) { cur = []; blocks.push(cur); } cur.push(s); } else cur = null; }
-  const block = blocks.find((b) => b[b.length - 1].k >= 0 && b[0].k <= 0) || blocks.find((b) => b[0].k > 0);
+  const block = day > 0 ? blocks.find((b) => b[0].k >= 0) : blocks.find((b) => b[b.length - 1].k >= 0 && b[0].k <= 0) || blocks.find((b) => b[0].k > 0);
   const ovProb = ov ? ovationAt(ov, city.lat, city.lon) : null;
   const srvProb = srv && typeof srv.prob === "number" ? srv.prob : null;
   const kpNow = kpAt(kps, new Date(now));
@@ -27,7 +47,7 @@ export async function auroraNight(city) {
   const pw = peekWeather(city);
   const cloudSrc = pw && !pw.stale && pw.wx?.hourly?.cloud_cover_low && pw.src === "met" ? "met" : "om";
   const raw = { ovNow: ovProb, kpNow, cloudSrc };
-  if (!block) return { city, hours: [], best: null, season: seasonStart(city), kpNow, kpMax: kpMaxNext(kps), ovTime: ov?.time || null, darkFull: 0, ok: true, ...raw };
+  if (!block) return { city, day, hours: [], best: null, season: seasonStart(city), kpNow, kpMax: kpMaxNext(kps), ovTime: ov?.time || null, darkFull: 0, ok: true, nights: auroraNights(city, kps), ...raw };
 
   const cloudIdx = cl ? new Map(cl.time.map((x, i) => [x, i])) : null;
   const hours = block.map(({ d, sun }) => {
@@ -47,7 +67,10 @@ export async function auroraNight(city) {
   const best = (future.length ? future : hours).reduce((a, b) => (b.score > a.score ? b : a));
   let darkFull = hours.filter((h) => h.sun < -18).length;
   try { const tw = twilight(ymdOf(dateToLocal(block[0].d, city.tz)), city.lat, city.lon, city.tz); if (tw && typeof tw.darkHours === "number") darkFull = tw.darkHours; } catch { /* */ }
-  return { city, hours, best, season: null, kpNow, kpMax: kpMaxNext(kps), ovTime: ov?.time || null, darkFull, ok: true, noKp: !kps, noCloud: !cl, ...raw };
+  const nk = hours.map((h) => h.kp).filter((x) => x != null);
+  const kpNight = nk.length ? Math.max(...nk) : null, kpPartial = nk.length > 0 && nk.length < hours.length;
+  const noCloudNight = hours.every((h) => !h.cloudKnown);
+  return { city, day, hours, best, season: null, kpNow, kpNight, kpPartial, kpMax: kpMaxNext(kps), ovTime: ov?.time || null, darkFull, ok: true, noKp: !kps, noCloud: !cl || noCloudNight, nights: auroraNights(city, kps), ...raw };
 }
 function kpMaxNext(kps) { if (!kps) return null; const n = Date.now(); const f = kps.filter((x) => x.t.getTime() >= n - 3 * H && x.t.getTime() <= n + 72 * H); return f.length ? Math.max(...f.map((x) => x.kp)) : null; }
 
@@ -183,10 +206,11 @@ function listRowRaw(n, li, root) {
 }
 
 function detailRaw(n, c, kpTxt, alertBtn) {
+  const fut = n.day > 0, kpH = fut ? n.kpNight : n.kpNow;
   const head = `<section class="card center au-head">
-      ${kpGaugeSVG(n.kpNow, t("aurora.raw.gaugeA11y", { v: n.kpNow != null ? n.kpNow.toFixed(1) : "–" }))}
-      <p class="au-kpline"><b>${esc(gText(n.kpNow))}</b></p>
-      <p class="muted tiny">${n.kpMax != null ? esc(t("aurora.raw.kpMax", { v: n.kpMax.toFixed(1) })) : ""}</p>
+      ${kpGaugeSVG(kpH, t("aurora.raw.gaugeA11y", { v: kpH != null ? kpH.toFixed(1) : "–" }))}
+      <p class="au-kpline"><b>${fut ? esc(t("aurora.night.kpMax")) + " · " : ""}${esc(gText(kpH))}</b></p>
+      <p class="muted tiny">${fut ? (n.kpPartial ? esc(t("aurora.night.kpPartial")) : "") : n.kpMax != null ? esc(t("aurora.raw.kpMax", { v: n.kpMax.toFixed(1) })) : ""}</p>
       ${n.kpMax >= 8 ? `<p class="notice tiny">${esc(t("aurora.kp8Notice"))}</p>` : ""}
     </section>`;
   const foot = `${alertBtn}<p class="muted tiny">${esc(t("aurora.sources"))}${n.ovTime ? " · OVATION " + esc(String(n.ovTime).replace("T", " ").slice(0, 16)) + " UTC" : ""}</p>${asPublishedNote()}`;
@@ -194,13 +218,16 @@ function detailRaw(n, c, kpTxt, alertBtn) {
     return head + `<section class="card center"><p>${esc(t("aurora.seasonOff"))}</p><p>${esc(n.season.from ? t("aurora.seasonFrom", { date: monthDay(n.season.from, lang()) }) : t("aurora.seasonNone"))}</p></section>` + foot;
   }
   const now = Date.now();
-  const h0 = n.hours.find((h) => h.d.getTime() + H > now) || n.hours[0];
+  // 오늘 밤은 지금 시각, 다른 밤은 한밤중(가장 어두운 시간)
+  const h0 = n.day > 0 ? n.hours.reduce((a, b) => (b.sun < a.sun ? b : a)) : n.hours.find((h) => h.d.getTime() + H > now) || n.hours[0];
   const cl = h0.cloud || {};
   const r0 = (x) => (x == null ? "–" : Math.round(x));
   let mrs = null;
-  try { mrs = riseSetMoon(c); } catch { /* */ }
+  try { mrs = riseSetMoon(c, n.hours[0] ? ymdOf(n.hours[0].local) : null); } catch { /* */ }
   const tiles = `<section class="tiles">
-      <div class="tile"><span class="tl-h">${icon("aurora", { cls: "sm" })} ${esc(t("aurora.raw.activity"))}</span><b>${n.ovNow != null ? esc(pct(n.ovNow)) : "–"}</b><small>${esc(t("aurora.raw.ovLabel"))}${n.ovTime ? " · " + esc(String(n.ovTime).slice(11, 16)) + " UTC" : ""}</small></div>
+      ${n.day > 0
+        ? `<div class="tile"><span class="tl-h">${icon("aurora", { cls: "sm" })} ${esc(t("aurora.raw.activity"))}</span><b>${h0.kp != null ? "Kp " + esc(h0.kp.toFixed(1)) : "–"}</b><small>${esc(t("aurora.night.kpAt", { time: hourLabel(h0.local, lang(), true) }))}</small></div>`
+        : `<div class="tile"><span class="tl-h">${icon("aurora", { cls: "sm" })} ${esc(t("aurora.raw.activity"))}</span><b>${n.ovNow != null ? esc(pct(n.ovNow)) : "–"}</b><small>${esc(t("aurora.raw.ovLabel"))}${n.ovTime ? " · " + esc(String(n.ovTime).slice(11, 16)) + " UTC" : ""}</small></div>`}
       <div class="tile"><span class="tl-h">${icon("cloud", { cls: "sm" })} ${esc(t("aurora.raw.cloud"))}</span><b>${cl.total != null ? esc(pct(cl.total)) : "–"}</b><small>${h0.cloudKnown ? esc(t("aurora.cloudLayers", { l: r0(cl.low), m: r0(cl.mid), h: r0(cl.high) })) + " · " : ""}${esc(srcName(n.cloudSrc || "om"))} · ${esc(hourLabel(h0.local, lang(), true))}</small></div>
       <div class="tile"><span class="tl-h">${icon("moon", { cls: "sm" })} ${esc(t("aurora.f.dark"))}</span><b>${esc(t("aurora.raw.darkH", { n: Math.round(n.darkFull * 10) / 10 }))}</b><small>${esc(t("aurora.moonIllum", { v: Math.round(h0.moonIllum * 100) }))}${mrs && (mrs.rise || mrs.set) ? " · " + esc(t("moon.riseSet", { rise: clockAt(mrs.rise, c.tz), set: clockAt(mrs.set, c.tz) })) : ""}</small></div>
     </section>`;
@@ -211,7 +238,7 @@ function detailRaw(n, c, kpTxt, alertBtn) {
     </section>`;
   return head + tiles + hourly + foot;
 }
-function riseSetMoon(c) { const ymd = ymdOf(dateToLocal(new Date(), c.tz)); return riseSet("moon", ymd, c.lat, c.lon, c.tz); }
+function riseSetMoon(c, ymd) { return riseSet("moon", ymd || ymdOf(dateToLocal(new Date(), c.tz)), c.lat, c.lon, c.tz); }
 
 /* ---------- 화면 ---------- */
 export function renderAuroraList(root, ctx) {
@@ -245,15 +272,24 @@ export function renderAuroraList(root, ctx) {
 export async function renderAuroraDetail(root, ctx, id) {
   const c = ctx.store.get().auroraCities.find((x) => x.id === id);
   if (!c) { root.innerHTML = header(t("shoot.aurora"), { backLabel: t("back") }) + `<p class="pad muted">${esc(t("error.noCity"))}</p>`; return; }
-  root.innerHTML = header(cityName(c), { backLabel: t("back") }) + `<div class="pad au-detail"><div class="spin" aria-hidden="true"></div></div>`;
-  const body = root.querySelector(".au-detail");
+  root.innerHTML = header(cityName(c), { backLabel: t("back") }) + `<div class="pad"><div class="au-days seg" role="group" aria-label="${esc(t("aurora.night.pick"))}"></div><div class="au-detail"><div class="spin" aria-hidden="true"></div></div></div>`;
+  const body = root.querySelector(".au-detail"), daysEl = root.querySelector(".au-days");
+  const day = Math.max(0, Math.min(4, +(ctx.auroraDay?.[c.id] ?? 0) || 0));
   let n;
-  try { n = await auroraNight(c); } catch (e) { console.warn(e); body.innerHTML = `<p>${esc(t("error.weather"))}</p>`; return; }
+  try { n = await auroraNight(c, day); } catch (e) { console.warn(e); body.innerHTML = `<p>${esc(t("error.weather"))}</p>`; return; }
   if (!root.isConnected) return;
+  // 날짜(밤) 고르기 — NOAA Kp 예보가 나오는 밤까지만
+  const nights = n.nights || [{ day: 0 }];
+  if (n.day > 0 && !nights.some((x) => x.day === n.day)) { ctx.auroraDay = { ...(ctx.auroraDay || {}), [c.id]: 0 }; return renderAuroraDetail(root, ctx, id); }
+  const dlabel = (x) => (x.day === 0 ? t("aurora.tonight") : x.day === 1 ? t("aurora.night.tomorrow") : t("aurora.night.of", { date: monthDay(x.ymd, lang()) }));
+  daysEl.innerHTML = nights.length > 1 ? nights.map((x) => `<button type="button" data-day="${x.day}" class="${x.day === n.day ? "on" : ""}" aria-pressed="${x.day === n.day}">${esc(dlabel(x))}</button>`).join("") : "";
+  daysEl.hidden = nights.length <= 1;
+  daysEl.onclick = (e) => { const b = e.target.closest("[data-day]"); if (!b) return; ctx.auroraDay = { ...(ctx.auroraDay || {}), [c.id]: +b.dataset.day }; renderAuroraDetail(root, ctx, id); };
+  const limitNote = nights.length > 1 ? `<p class="muted tiny">${esc(t("aurora.night.limit"))}</p>` : "";
   const kpTxt = n.kpNow != null ? `Kp ${n.kpNow.toFixed(1)} · G${kpToG(n.kpNow)}` : t("aurora.kpUnknown");
   const alertBtn = flag("aurora_alert") ? `<button class="btn ghost" data-act="alert">${icon("bell", { cls: "sm" })} ${esc(t("aurora.alert"))}</button>` : "";
   if (!ownForecast()) {
-    body.innerHTML = detailRaw(n, c, kpTxt, alertBtn);
+    body.innerHTML = detailRaw(n, c, kpTxt, alertBtn) + limitNote;
     body.querySelector("[data-act=alert]")?.addEventListener("click", () => toast(t("aurora.alertSoon")));
     return;
   }
