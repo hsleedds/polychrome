@@ -42,6 +42,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .topbar h1 { flex: 1; margin: 0; font-size: 18px; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar .sp { width: 40px; } .topbar .ph-src { min-width: 40px; text-align: right; }
 .icon-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; }
+.text-btn { min-width: 40px; height: 40px; padding: 0 10px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--accent, #3b6fd8); }
+.text-btn:hover { background: var(--line); }
 .icon-btn:hover { background: var(--line); } .icon-btn:disabled { opacity: .3; cursor: default; }
 
 /* ---- 아래 메뉴 ---- */

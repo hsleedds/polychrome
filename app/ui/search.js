@@ -8,7 +8,11 @@ import { MAX_CITIES } from "../config.js";
 
 export function renderSearch(root, ctx, mode = "weather") {
   const aur = mode === "aurora";
-  root.innerHTML = header(aur ? t("aurora.addCity") : t("city.add"), { backLabel: t("back") }) + `
+  // 지역 추가에서 그냥 나가면 메인 도시 장으로 돌아가게 (「지역 추가」 장에 머물지 않도록)
+  if (!aur) ctx.pagerIdx = null;
+  // 왼쪽 뒤로 버튼과 함께, 눈에 잘 띄는 「취소」 글자 버튼도 오른쪽에 둠
+  const cancelBtn = `<button class="text-btn" data-act="back">${esc(t("cancel"))}</button>`;
+  root.innerHTML = header(aur ? t("aurora.addCity") : t("city.add"), { backLabel: t("back"), right: cancelBtn }) + `
     <div class="search pad">
       <label class="search-box">${icon("search", { cls: "sm" })}<input type="search" id="q" autocomplete="off" enterkeyhint="search" placeholder="${esc(t(aur ? "search.placeholderWorld" : "search.placeholder"))}" aria-label="${esc(t("search.label"))}"></label>
       ${!aur && !ctx.store.canAdd() ? `<p class="notice">${esc(t("city.full", { n: MAX_CITIES }))}</p>` : ""}
