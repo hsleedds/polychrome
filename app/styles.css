@@ -308,9 +308,12 @@ ul.plain { margin: 0; padding-left: 18px; font-size: 14px; }
 .sil-grid { stroke: #fff; stroke-opacity: .13; stroke-width: 1.5; }
 .sil-ax { fill: #fff; fill-opacity: .72; font-size: 26px; font-family: inherit; paint-order: stroke; stroke: rgba(0,0,0,.35); stroke-width: 4px; }
 .sil-ground { fill: #2b3346; fill-opacity: .55; }
-.sil-terrain { fill: #34405a; fill-opacity: .9; }
+.sil-terrain { fill-opacity: 1; }
+.sil-terrain.night { fill: #141a28; } .sil-terrain.day { fill: #56604f; }
+.sil-ridge { fill: none; stroke-width: 3; stroke-linejoin: round; }
+.sil-ridge.night { stroke: #9fb3d9; stroke-opacity: .55; } .sil-ridge.day { stroke: #2f3a2b; stroke-opacity: .7; }
 .sil-hz { stroke: #fff; stroke-opacity: .45; stroke-width: 2; stroke-dasharray: 10 8; }
-.sil-lm { fill: #0d1220; fill-opacity: .94; stroke: #0d1220; stroke-width: 1; stroke-linejoin: round; }
+.sil-lm { fill: #05070d; fill-opacity: 1; stroke: #05070d; stroke-width: 1; stroke-linejoin: round; }
 .sil-path { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 0.1 13; }
 .sil-path.sun { stroke: #fff2b8; } .sil-path.moon { stroke: #f4ecc8; }
 .sil-tick { fill: #fff; fill-opacity: .9; }

@@ -288,7 +288,8 @@ export async function renderSilhouette(root, ctx) {
     if (terr) {
       const n = 240, pts = [];
       for (let i = 0; i <= n; i++) { const az = V.azC - V.azHalf + (2 * V.azHalf) * i / n; const h = horizonAt(terr, az); pts.push(`${f1(V.x(az))},${f1(V.y(h ?? 0))}`); }
-      parts.push(`<polygon points="0,${H} ${pts.join(" ")} ${W},${H}" class="sil-terrain"/>`);
+      parts.push(`<polygon points="0,${H} ${pts.join(" ")} ${W},${H}" class="sil-terrain ${night ? "night" : "day"}"/>`);
+      parts.push(`<polyline points="${pts.join(" ")}" class="sil-ridge ${night ? "night" : "day"}"/>`); // 능선이 하늘과 구분되게
     } else parts.push(`<rect x="0" y="${f1(y0)}" width="${W}" height="${f1(Math.max(0, H - y0))}" class="sil-ground"/>`);
     parts.push(`<line x1="0" x2="${W}" y1="${f1(y0)}" y2="${f1(y0)}" class="sil-hz"/>`);
     // 구조물
@@ -457,7 +458,7 @@ export async function renderSilhouette(root, ctx) {
     if (tMs >= b) tMs = a;
     playing = true; lastTs = 0;
     playBtn.innerHTML = `<span aria-hidden="true">❚❚</span>`; playBtn.setAttribute("aria-label", t("sil.pause"));
-    const speed = Math.max(20, (b - a) / 60e3 / 14); // 분/초 — 전체를 약 14초에
+    const speed = Math.max(20 / 3, (b - a) / 60e3 / 42); // 분/초 — 전체를 약 42초에 (HS 요청: 3배 느리게)
     let acc = 0;
     const step = (ts) => {
       if (!playing || !root.isConnected) return;
