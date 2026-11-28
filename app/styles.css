@@ -385,3 +385,6 @@ ul.plain { margin: 0; padding-left: 18px; font-size: 14px; }
 .sil-addspot-btns { display: flex; gap: 8px; margin-top: 6px; }
 .sil-addspot-btns .btn { min-height: 44px; flex: 1; }
 .sil-paste { margin-top: 8px; }
+.sil-askspot { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--rain-soft); font-size: 14px; }
+.sil-askspot[hidden], .sil-addspot[hidden] { display: none; }
+.sil-myspots:empty { display: none; }

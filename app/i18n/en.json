@@ -415,6 +415,8 @@
  "sil.spotDelQ": "Remove “{name}” from my spots?",
  "sil.paste": "Paste coordinates (copied from a map app)",
  "sil.pasteBad": "Use the form “37.5497, 127.0310”",
+ "sil.spotAsk": "Save this position to My spots?",
+ "sil.spotOnce": "Just this once",
  "sil.lensDrag": "Lens frame — drag to move",
  "sil.lens": "Lens frame (full-frame, landscape)",
  "sil.lensNone": "Off",

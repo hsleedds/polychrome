@@ -187,7 +187,7 @@ export async function renderSilhouette(root, ctx) {
   const kmTo = (p) => { try { const l = LC().findLandmark(P.id); return l ? S().distanceKm(p.lat, p.lon, l.lat, l.lon) : null; } catch { return null; } };
   const spotBtns = () => spots.map((p, i) => { const on = near(p), d = kmTo(p);
     return `<span class="spot-chip${on ? " on" : ""}"><button type="button" class="chip-btn${on ? " on" : ""}" data-spot="${i}" aria-pressed="${on}">★ ${esc(p.name)}${d != null ? ` <small>${fix(d)} km</small>` : ""}</button><button type="button" class="spot-del" data-spot-del="${i}" aria-label="${esc(t("sil.spotDel", { name: p.name }))}">×</button></span>`; }).join("")
-    + `<button type="button" class="chip-btn add" data-spot-add="1">＋ ${esc(t("sil.spotAdd"))}</button>`;
+;
   const near = (p) => P.lat != null && Math.abs(p.lat - P.lat) < 1e-4 && Math.abs(p.lon - P.lon) < 1e-4;
   body.innerHTML = `
     <section class="card sil-ctl">
@@ -204,6 +204,8 @@ export async function renderSilhouette(root, ctx) {
       <fieldset class="fld sil-pos"><legend>${esc(t("sil.position"))}</legend>
         <div class="sil-presets" role="group" aria-label="${esc(t("sil.presets"))}">${presetBtns()}</div>
         <div class="sil-myspots" role="group" aria-label="${esc(t("sil.mySpots"))}">${spotBtns()}</div>
+        <div class="sil-askspot" role="group" hidden><span>${esc(t("sil.spotAsk"))}</span>
+          <div class="sil-addspot-btns"><button type="button" class="btn" data-spot-add="1">${esc(t("sil.spotSave"))}</button><button type="button" class="btn ghost" data-spot-once="1">${esc(t("sil.spotOnce"))}</button></div></div>
         <form class="sil-addspot" hidden>
           <label class="fld"><span>${esc(t("sil.spotName"))}</span><input id="sil-spot-name" type="text" maxlength="30" enterkeyhint="done" placeholder="${esc(t("sil.spotNamePh"))}"></label>
           <div class="sil-addspot-btns"><button type="submit" class="btn">${esc(t("sil.spotSave"))}</button><button type="button" class="btn ghost" data-spot-cancel="1">${esc(t("cancel"))}</button></div>
@@ -696,11 +698,13 @@ export async function renderSilhouette(root, ctx) {
     else if (b.dataset.preset != null) {
       const p = PRESETS[P.id][+b.dataset.preset]; if (!p) return;
       P.preset = +b.dataset.preset; P.lat = p.lat; P.lon = p.lon; $("#sil-lat").value = p.lat; $("#sil-lon").value = p.lon;
+      $(".sil-askspot").hidden = true; $(".sil-addspot").hidden = true;
       $(".sil-presets").innerHTML = presetBtns(); refresh({ keepTime: true });
     } else if (b.dataset.spot != null) {
       const p = spots[+b.dataset.spot]; if (!p) return;
       P.lat = p.lat; P.lon = p.lon; if (isFinite(p.eye)) P.eye = p.eye;
       $("#sil-lat").value = p.lat; $("#sil-lon").value = p.lon; $("#sil-eye").value = P.eye;
+      $(".sil-askspot").hidden = true; $(".sil-addspot").hidden = true;
       repaintSpots(); refresh({ keepTime: true });
     } else if (b.dataset.spotDel != null) {
       const p = spots[+b.dataset.spotDel]; if (!p) return;
@@ -708,8 +712,9 @@ export async function renderSilhouette(root, ctx) {
       spots.splice(+b.dataset.spotDel, 1); saveSpots(spots); repaintSpots();
     } else if (b.dataset.spotAdd) {
       if (P.lat == null || P.lon == null) { sumEl.textContent = t("sil.badPos"); return; }
+      $(".sil-askspot").hidden = true;
       const f = $(".sil-addspot"); f.hidden = false; const inp = $("#sil-spot-name"); inp.value = ""; inp.focus();
-    } else if (b.dataset.spotCancel) { $(".sil-addspot").hidden = true; }
+    } else if (b.dataset.spotCancel || b.dataset.spotOnce) { $(".sil-addspot").hidden = true; $(".sil-askspot").hidden = true; }
     else if (b.dataset.fbody) { F.body = b.dataset.fbody; startFinder(); }
     else if (b.dataset.fi != null) { const w = F.rows[+b.dataset.fi]; if (w) pickRow(w); }
     else if (b.dataset.fg != null) { F.open.add(+b.dataset.fg); renderFinder(); }
@@ -722,6 +727,9 @@ export async function renderSilhouette(root, ctx) {
     const la = parseFloat($("#sil-lat").value), lo = parseFloat($("#sil-lon").value), ey = parseFloat($("#sil-eye").value);
     P.lat = isFinite(la) ? la : null; P.lon = isFinite(lo) ? lo : null; P.eye = isFinite(ey) && ey >= 0 && ey <= 500 ? ey : 1.6;
     repaintSpots();
+    // 직접 넣은 좌표면 저장할지 묻는다 (한 번만 쓸 수도 있으니 자동 저장 안 함)
+    const known = P.lat == null || spots.some(near) || (PRESETS[P.id] || []).some(near);
+    $(".sil-askspot").hidden = known; if (known) $(".sil-addspot").hidden = true;
     refresh({ keepTime: true });
   };
   for (const id of ["#sil-lat", "#sil-lon", "#sil-eye"]) $(id).addEventListener("change", onPos);
