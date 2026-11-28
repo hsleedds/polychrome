@@ -189,3 +189,20 @@ test("terrain: Terrarium 스텁으로 전체 프로파일 (타일 수·시간)",
   assert.ok(ms < 3000, "ms " + ms);
   console.log(`       (terrarium profile: ${p.samples} samples, ${calls.length} tiles, ${ms.toFixed(0)} ms)`);
 });
+
+test("terrain: nearKm 무시·snapKm 정상 고도", async () => {
+  const T = (await import("../core/terrain-core.js")).default ?? globalThis.TerrainCore;
+  // 관측점 동쪽 100 m에 50 m 언덕(좁음), 서쪽 10 km에 300 m 산
+  const src = T.syntheticSource((lat, lon) => {
+    const dx = (lon - 127) * 88200, dy = (lat - 37.5) * 111000;
+    if (dx > 80 && dx < 140 && Math.abs(dy) < 300) return 50;
+    if (dx < -9800 && dx > -10200) return 300;
+    return 0;
+  });
+  const a = await T.horizonProfile(src, { lat: 37.5, lon: 127, maxKm: 15, stepDeg: 1 });
+  const b = await T.horizonProfile(src, { lat: 37.5, lon: 127, maxKm: 15, stepDeg: 1, nearKm: 0.2, snapKm: 0.2 });
+  if (!(T.horizonAt(a, 90) > 10)) throw new Error("near hill should block without nearKm");
+  if (!(T.horizonAt(b, 90) < 1)) throw new Error("near hill ignored with nearKm");
+  if (!(b.groundM >= 50)) throw new Error("snap to local high " + b.groundM);
+  if (!(T.horizonAt(b, 270) > 1 && T.horizonAt(b, 270) < 2)) throw new Error("far mountain " + T.horizonAt(b, 270));
+});

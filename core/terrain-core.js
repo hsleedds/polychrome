@@ -209,7 +209,14 @@
     }
     const el = await source.elevations(pts);
     let groundM = o.groundM;
-    if (!fin(groundM)) { groundM = fin(el[0]) ? el[0] : 0; if (clampSea) groundM = Math.max(0, groundM); }
+    // nearKm: 관측점 바로 옆(타일 해상도보다 가까운) 땅은 무시 — 전망대·정상에 선 사진가 기준
+    // snapKm: 지면 고도를 반경 안 가장 높은 땅으로(프리셋 좌표가 산 정상에서 약간 비껴 있어도 정상에 선 것으로)
+    const nearKm = Math.max(0, o.nearKm ?? 0), snapKm = Math.max(0, o.snapKm ?? 0);
+    if (!fin(groundM)) {
+      groundM = fin(el[0]) ? el[0] : 0;
+      if (snapKm > 0) for (let i = 0; i < N; i++) for (let j = 0; j < M && dists[j] <= snapKm; j++) { const h = el[1 + i * M + j]; if (fin(h) && h > groundM) groundM = h; }
+      if (clampSea) groundM = Math.max(0, groundM);
+    }
     const H = groundM + eyeM;
     const floorAlt = horizonDip(Math.max(eyeM, H), k), floorKm = horizonDistKm(Math.max(eyeM, H), k);
     const drop = dists.map(d => d * d * 1e6 / (2 * EARTH_M) * (1 - k));
@@ -217,6 +224,7 @@
     for (let i = 0; i < N; i++) {
       let best = -Infinity, bestD = floorKm;
       for (let j = 0; j < M; j++) {
+        if (dists[j] < nearKm) continue;
         let h = el[1 + i * M + j];
         if (!fin(h)) continue;
         if (clampSea && h < 0) h = 0;

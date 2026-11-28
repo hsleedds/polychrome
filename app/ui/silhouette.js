@@ -104,7 +104,7 @@ function loadTerrain(lat, lon, eyeM) {
         groundOk = typeof r[0] === "number" && isFinite(r[0]);
         return r;
       } };
-      const prof = await T.horizonProfile(probe, { lat, lon, eyeM, maxKm: 40, stepDeg: 0.25 });
+      const prof = await T.horizonProfile(probe, { lat, lon, eyeM, maxKm: 40, stepDeg: 0.25, nearKm: 0.2, snapKm: 0.2 });
       if (!prof || okFrac < 0.5) return null;
       if (!groundOk) prof.groundM = NaN; // 관측점 고도는 모름 → 프리셋 값/0 m
       return { prof, src };
