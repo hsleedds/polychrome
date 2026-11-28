@@ -39,6 +39,20 @@ export function agencyCount(cm, from, hours = 24) {
 
 /** 주 예보(화면 기본 예보)의 출처 키: 기상청 덮어쓰기 → kma, MET 대체 → met, 그 밖 Open-Meteo 최적 모델 → om */
 export function primarySrc(res) { return res?.kmaBase ? "kma" : res?.src === "met" ? "met" : "om"; }
+/** SPEC 12 출처 키 → 이름. 시간별 키(kma_ultra·kma_vilage·om·met·모델)와 예전 키(kma·om·met) 모두 */
+export function srcLabel(k) { return t.has("fsrc.name." + k) ? t("fsrc.name." + k) : t("srcName." + k); }
+/** 날별 줄 이름: 기상청 날별 값은 초단기+단기 시간별에서 나오므로 「기상청」 */
+export function dailySrcLabel(k) { return k && k.startsWith("kma") ? t("srcName.kma") : k === "om" ? t("srcName.om") : srcLabel(k); }
+/** 시간 j의 출처 키 (이어 붙이기 전 예보면 주 예보 출처) */
+export function srcAt(vm, j) { return vm.H.src?.[j] || primarySrc(vm.res); }
+/** [from, to) 구간의 출처 이름을 바뀌는 순서대로 「A → B」 (이어 붙이기 전 예보면 주 예보 출처 하나) */
+export function srcRunsText(vm, from, to) {
+  const S = vm.H.src;
+  if (!Array.isArray(S)) return srcLabel(primarySrc(vm.res));
+  const names = [];
+  for (let j = Math.max(0, from); j < to && j < S.length; j++) { const n = S[j] ? srcLabel(S[j]) : null; if (n && names[names.length - 1] !== n) names.push(n); }
+  return names.length ? names.join(" → ") : srcLabel(primarySrc(vm.res));
+}
 /** 구름 층(높은·중간·낮은) 출처 — 기상청 덮어쓰기는 구름 층을 바꾸지 않으므로 바탕 예보 */
 export function cloudSrc(res) { return res?.src === "met" ? "met" : "om"; }
 
@@ -69,13 +83,14 @@ export function buildVM(city, res, air, models) {
   const strip = [];
   for (let k = 0; k < 8; k++) {
     const j = i + k * 3; if (j >= H.time.length) break;
-    strip.push({ time: H.time[j], temp: H.temperature_2m?.[j], icon: iconKey(H.weather_code?.[j], isDayAt(H, D, j), H.precipitation?.[j], H.wind_speed_10m?.[j]), wet: isWet(H.precipitation_probability?.[j], H.precipitation?.[j]) });
+    strip.push({ time: H.time[j], src: H.src?.[j] ?? null, temp: H.temperature_2m?.[j], icon: iconKey(H.weather_code?.[j], isDayAt(H, D, j), H.precipitation?.[j], H.wind_speed_10m?.[j]), wet: isWet(H.precipitation_probability?.[j], H.precipitation?.[j]) });
   }
   return {
     city, res, wx, H, D, now, i, today, di, curT, curA, code, day, ik, moon, r24, r48, cons, agency, consModels: cm, sum, strip, air,
     airG: air ? airGrade(air.pm10, air.pm25) : null,
     tmax: D.temperature_2m_max?.[di], tmin: D.temperature_2m_min?.[di],
     windMs, hum: C.relative_humidity_2m ?? H.relative_humidity_2m?.[i],
+    srcNow: H.src?.[i] ?? null,
   };
 }
 

@@ -1,9 +1,9 @@
-/*! Polychrome Weather Core v1.1.0 — 날씨 알고리즘 (예보 수집·대체·기상청 덮어쓰기·라운드 등급·기관 비교·비 합의 예보·한 줄 요약)
+/*! Polychrome Weather Core v1.2.0 — 날씨 알고리즘 (예보 수집·대체·기상청 덮어쓰기·라운드 등급·기관 비교·비 합의 예보·한 줄 요약)
  *  © 2026 HYEOKSANG LEE. All rights reserved. 소유: Polychrome · Roundcast는 이 파일의 고정 버전(pinned) 사본을 넣어 사용.
  *  원본: Roundcast index.html 2026.11.15b 에서 분리(v1.0.0). 시간대 인자(tz)를 생략하면 "Asia/Seoul"로 동작해 1.0.2와 결과 동일.
  *  변경 이력: CHANGELOG.md (docs/handoff-from-roundcast.md 참고) */
 (function(G){"use strict";
-const VERSION="1.1.0";
+const VERSION="1.2.0";
 /* ---- 설정: 앱이 WeatherCore.config({...}) 로 넣어 줌 (값 대신 함수도 가능) ---- */
 const C={kma:()=>false,sbUrl:()=>"",sbKey:()=>"",fetch:null,rawFetch:(u,o)=>fetch(u,o),tz:()=>"Asia/Seoul"};
 const fn=v=>typeof v==="function"?v:()=>v;
@@ -336,7 +336,69 @@ function iconKey(code,isDay,mm,windMs){
   return"cloudy";
 }
 
+/* =====================================================================
+ * 1.2.0 추가: 사용자 선택 예보 출처 — 구간(tier)별로 고른 기관의 시간별 예보를 하나로 이어 붙임 (SPEC 12)
+ * 값은 고른 기관의 발표 그대로(가공·가중 없음), 시간·날마다 실제 출처 키를 붙인다.
+ * series: {[key]: {hourly:{time,…}, daily?:{time,…}} | hourly}
+ * tiers: [{id, toH?, toDay?, sources:[key…]}…] — 순서대로. toH: 지금(시 단위 내림)+toH시간 전까지, toDay: 오늘+toDay일 0시 전까지,
+ *        둘 다 없으면 끝까지. 지난 시간은 첫 구간. 날별(daily) 행은 toH만 있는 구간을 건너뛴다(시간 전용 구간).
+ * 한 칸의 후보: 그 구간 sources → 뒤 구간 sources → 앞 구간 sources → 나머지 series 순, 값(기온 또는 강수량)이 있는 첫 출처.
+ * opts: {fill?:key — 고른 출처에 없는 보조 값(구름 층·체감·시정 등)을 채울 출처, own?:[필드] — 채우지 않는 핵심 값,
+ *        axis?:key — 시간 축(기본: 모든 출처 시각의 합집합), minDayHours=12 — 날별 값을 시간별로 만들 때 최소 시간 수}
+ * 반환 {hourly:{time, src[], tier[], 필드…}, daily:{time, src[], tier[], derived[], 필드…}, sources[], changes:[{i, src}]} */
+const STITCH_OWN=["temperature_2m","precipitation","precipitation_probability","weather_code","wind_speed_10m"];
+const DAILY_OWN=["temperature_2m_max","temperature_2m_min","precipitation_sum","precipitation_probability_max","weather_code","wind_speed_10m_max"];
+const STITCH_SKIP=new Set(["time","src","tier","kma","derived"]);
+const plusHours=(iso,h)=>new Date(Date.parse(iso.slice(0,13)+":00:00Z")+h*36e5).toISOString().slice(0,16);
+function stitchBySource(series,tiers,nowIso,opts){
+  opts=opts||{};series=series||{};tiers=(tiers||[]).filter(t=>t&&Array.isArray(t.sources));
+  if(!tiers.length)tiers=[{id:"all",sources:[]}];
+  const S={};
+  for(const k of Object.keys(series)){const v=series[k];if(!v)continue;const h=v.hourly||(Array.isArray(v.time)?v:null);if(!h||!Array.isArray(h.time))continue;
+    const d=v.daily&&Array.isArray(v.daily.time)?v.daily:null;
+    S[k]={h,d,hi:new Map(h.time.map((t,i)=>[t,i])),di:new Map(d?d.time.map((t,i)=>[t,i]):[])}}
+  const keys=Object.keys(S),own=new Set(opts.own||STITCH_OWN),fillK=opts.fill&&S[opts.fill]?opts.fill:null,minH=opts.minDayHours??12;
+  const now=String(nowIso||localNow()).slice(0,13)+":00",today=now.slice(0,10);
+  const ends=tiers.map(t=>t.toH!=null?plusHours(now,+t.toH):t.toDay!=null?addDays(today,+t.toDay)+"T00:00":null);
+  const tierOfHour=t=>{for(let k=0;k<tiers.length;k++)if(ends[k]==null||t<ends[k])return k;return tiers.length-1};
+  const tierOfDay=d=>{const ds=d+"T00:00";let last=-1;for(let k=0;k<tiers.length;k++){if(tiers[k].toH!=null&&tiers[k].toDay==null)continue;last=k;if(ends[k]==null||ds<ends[k])return k}return last>=0?last:tiers.length-1};
+  const candMem=new Map();
+  const cands=ti=>{if(candMem.has(ti))return candMem.get(ti);const a=[];const add=l=>{for(const k of l||[])if(S[k]&&!a.includes(k))a.push(k)};
+    for(let k=ti;k<tiers.length;k++)add(tiers[k].sources);for(let k=ti-1;k>=0;k--)add(tiers[k].sources);add(keys);candMem.set(ti,a);return a};
+  const has=(h,i)=>i!=null&&((h.temperature_2m&&h.temperature_2m[i]!=null)||(h.precipitation&&h.precipitation[i]!=null));
+  /* 시간별 */
+  let T;if(opts.axis&&S[opts.axis])T=S[opts.axis].h.time.slice();else{const u=new Set();for(const k of keys)for(const t of S[k].h.time)u.add(t);T=[...u].sort()}
+  const F=[];for(const k of keys)for(const f of Object.keys(S[k].h))if(!STITCH_SKIP.has(f)&&Array.isArray(S[k].h[f])&&!F.includes(f))F.push(f);
+  const H={time:T,src:[],tier:[]};for(const f of F)H[f]=[];
+  const fill=fillK?S[fillK]:null,changes=[],used=[];
+  T.forEach((t,i)=>{const ti=tierOfHour(t);let src=null,si=null;
+    for(const k of cands(ti)){const j=S[k].hi.get(t);if(has(S[k].h,j)){src=k;si=j;break}}
+    H.src.push(src);H.tier.push(tiers[ti].id??ti);
+    if(src&&!used.includes(src))used.push(src);
+    if(i>0&&src!==H.src[i-1])changes.push({i,src});
+    const fj=fill?fill.hi.get(t):null;
+    for(const f of F){let v=src!=null?S[src].h[f]?.[si]:null;if(v==null&&fill&&fj!=null&&!own.has(f))v=fill.h[f]?.[fj];H[f].push(v??null)}});
+  /* 날별 */
+  let DT;{const u=new Set();for(const k of keys)if(S[k].d)for(const d of S[k].d.time)u.add(d);if(!u.size)for(const t of T)u.add(t.slice(0,10));DT=[...u].sort()}
+  const DF=DAILY_OWN.slice();for(const k of keys)if(S[k].d)for(const f of Object.keys(S[k].d))if(!STITCH_SKIP.has(f)&&Array.isArray(S[k].d[f])&&!DF.includes(f))DF.push(f);
+  const D={time:DT,src:[],tier:[],derived:[]};for(const f of DF)D[f]=[];
+  const derive=(h,d)=>{const ii=[];h.time.forEach((t,i)=>{if(t.slice(0,10)===d&&has(h,i))ii.push(i)});if(ii.length<minH)return null;
+    const v=f=>ii.map(i=>h[f]?.[i]).filter(x=>x!=null),Tv=v("temperature_2m"),P=v("precipitation_probability"),R=v("precipitation"),W=v("wind_speed_10m");
+    const day=ii.filter(i=>{const hr=+h.time[i].slice(11,13);return hr>=6&&hr<=19}).map(i=>h.weather_code?.[i]).filter(x=>x!=null),C=day.length?day:v("weather_code");
+    return{temperature_2m_max:Tv.length?Math.max(...Tv):null,temperature_2m_min:Tv.length?Math.min(...Tv):null,precipitation_sum:R.length?r1(sum(R)):null,
+      precipitation_probability_max:P.length?Math.max(...P):null,weather_code:C.length?Math.max(...C):null,wind_speed_10m_max:W.length?Math.max(...W):null}};
+  DT.forEach(d=>{const ti=tierOfDay(d);let src=null,row=null,der=false;
+    for(const k of cands(ti)){const s=S[k],j=s.di.get(d);
+      if(s.d&&j!=null&&(s.d.temperature_2m_max?.[j]!=null||s.d.precipitation_sum?.[j]!=null)){src=k;row={};for(const f of DF)row[f]=s.d[f]?.[j]??null;break}
+      const r=derive(s.h,d);if(r){src=k;row=r;der=true;break}}
+    D.src.push(src);D.tier.push(tiers[ti]?.id??ti);D.derived.push(der);
+    if(src&&!used.includes(src))used.push(src);
+    const fj=fill&&fill.d?fill.di.get(d):null;
+    for(const f of DF){let v=row?row[f]:null;if(v==null&&fj!=null&&!DAILY_OWN.includes(f))v=fill.d[f]?.[fj];D[f].push(v??null)}});
+  return{hourly:H,daily:D,sources:used,changes};
+}
+
 const WC={VERSION,config,wfetch,WMO,grade,windWord,score,winGrade,tips,extreme,extremeDay,isWet,fogLevel,DOMESTIC,GLOBAL,SHOW_GLOBAL,metNorway,compareModels,MET_SYM,metCode,sunTimes,metAsOM,omOrMet,kmaGet,kmaWait,kmaOverlay,
-  localNow,localIso,tzOffsetMin,omUrl,rainOutlook,consensus,consensusWindow,airGrade,summary,iconKey};
+  localNow,localIso,tzOffsetMin,omUrl,rainOutlook,consensus,consensusWindow,airGrade,summary,iconKey,stitchBySource};
 G.WeatherCore=WC;if(typeof module!=="undefined"&&module.exports)module.exports=WC;
 })(typeof globalThis!=="undefined"?globalThis:this);

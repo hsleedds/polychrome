@@ -3,6 +3,7 @@ import { SB_URL, SB_KEY, DEFAULT_FLAGS, CACHE_MIN, MODELS_CACHE_MIN } from "./co
 import { safeStorage } from "./state.js";
 import { W, omUrl, localNow } from "./core.js";
 import { nowIndex } from "./format.js";
+import { resolveTiers, neededSources, tiersSig, kmaSeries, MODELS, DEFAULT_FSRC } from "./sources.js";
 
 const LS = safeStorage(typeof localStorage !== "undefined" ? localStorage : null);
 const mem = new Map();
@@ -100,12 +101,51 @@ function isKR(c) { return c.country === "KR" || (c.lat > 33 && c.lat < 38.7 && c
 
 function validWx(j) { return j && j.hourly && Array.isArray(j.hourly.time) && j.hourly.time.length > 0 && j.daily && Array.isArray(j.daily.time); }
 
+/* ---------- SPEC 12 예보 출처 ---------- */
+let fsrcPref = DEFAULT_FSRC;
+/** 설정의 예보 출처 (main.js가 상태 변경 때마다 넣어 줌) */
+export function setSourcePref(f) { fsrcPref = f || DEFAULT_FSRC; }
+export const sourcePref = () => fsrcPref;
+/** 도시별로 실제 적용될 구간 목록 (pro_gate·한국 여부 반영). base: 'om' | 'met' */
+export function tiersFor(city, base = "om") {
+  return resolveTiers(fsrcPref, { kr: isKR(city) && flag("kma"), gate: flag("pro_gate"), base });
+}
+const wxKey = (city) => "wx:" + ck(city) + ":" + tiersSig(tiersFor(city));
+
+/** Open-Meteo 모델 하나 (id 후보를 차례로, 기온이 하루 이상 있어야 사용) */
+async function fetchModel(city, key) {
+  for (const id of MODELS[key] || []) {
+    try {
+      const r = await tfetch(omUrl({ lat: city.lat, lon: city.lon, tz: city.tz, days: 7, models: id }), {}, 10000);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (validWx(j) && (j.hourly.temperature_2m || []).filter((v) => v != null).length >= 24) return j;
+    } catch { /* 다음 id */ }
+  }
+  return null;
+}
+
+/** 이어 붙인 결과를 앱 예보 모양으로: current는 지금 시간의 출처 값으로 맞춤, H.kma 호환 표시 */
+function applyStitch(wx, st, base, tz) {
+  const H = st.hourly, D = { ...st.daily };
+  H.kma = H.src.map((x) => (x && x.startsWith("kma") ? 1 : 0));
+  const out = { ...wx, hourly: H, daily: D, stitched: true };
+  const i = nowIndex(H.time, localNow(tz));
+  const sNow = H.src[i];
+  if (sNow && sNow !== base) {
+    const C = { ...(wx.current || {}) };
+    for (const f of ["temperature_2m", "apparent_temperature", "weather_code", "precipitation", "wind_speed_10m", "relative_humidity_2m"]) { const v = H[f]?.[i]; if (v != null) C[f] = v; }
+    out.current = C;
+  }
+  return out;
+}
+
 /**
- * 도시 예보: {wx, src:'om'|'met', kmaBase:'HH:MM'|null, at, stale}
- * 15분 캐시, 실패 시 오래된 캐시라도 사용(stale=true)
+ * 도시 예보: {wx, src:'om'|'met', kmaBase:'HH:MM'|null, kmaUltraBase, sig, tz, at, stale}
+ * wx.hourly.src[] / wx.daily.src[] = 시간·날별 출처 키 (SPEC 12). 15분 캐시, 실패 시 오래된 캐시라도 사용(stale=true)
  */
 export function getWeather(city, { force = false } = {}) {
-  const key = "wx:" + ck(city);
+  const key = wxKey(city);
   const c = cacheGet(key, CACHE_MIN);
   if (c?.fresh && !force) return Promise.resolve({ ...c.v, at: c.at, stale: false });
   return once(key, async () => {
@@ -113,18 +153,29 @@ export function getWeather(city, { force = false } = {}) {
     try {
       if (!wc || typeof wc.omOrMet !== "function") throw new Error("core");
       const url = omUrl({ lat: city.lat, lon: city.lon, tz: city.tz, days: 7 });
-      const kmaP = isKR(city) && flag("kma") && typeof wc.kmaWait === "function" ? wc.kmaWait(city.lat, city.lon).catch(() => null) : Promise.resolve(null);
+      const need = neededSources(tiersFor(city));
+      const kmaP = need.kma && typeof wc.kmaWait === "function" ? wc.kmaWait(city.lat, city.lon).catch(() => null) : Promise.resolve(null);
+      const modelP = Promise.all(need.models.map((m) => fetchModel(city, m).then((j) => [m, j])));
       let wx = await wc.omOrMet(url, [[city.lat, city.lon]], 7, city.tz);
       if (Array.isArray(wx)) wx = wx[0];
       if (!validWx(wx)) throw new Error("shape");
       const src = wx.src === "met" ? "met" : "om";
-      let kmaBase = null;
-      const k = await kmaP;
-      if (k && typeof wc.kmaOverlay === "function") {
+      const tiers = tiersFor(city, src);
+      let kmaBase = null, kmaUltraBase = null;
+      const [k, models] = await Promise.all([kmaP, modelP]);
+      const hhmm = (t) => (t ? `${t.slice(0, 2)}:${t.slice(2, 4)}` : null);
+      if (typeof wc.stitchBySource === "function") {
+        const series = { [src]: wx, ...kmaSeries(k) };
+        for (const [m, j] of models) if (j) series[m] = j;
+        const st = wc.stitchBySource(series, tiers, localNow(city.tz), { fill: src, axis: src });
+        wx = applyStitch(wx, st, src, city.tz);
+        if (st.sources.some((x) => x.startsWith("kma"))) { kmaBase = hhmm(k?.base?.vilage?.time) || "—"; kmaUltraBase = hhmm(k?.base?.ultra?.time); }
+      } else if (k && typeof wc.kmaOverlay === "function") {
+        // 1.1.0 core: 예전 방식(기상청 덮어쓰기)
         const n = wc.kmaOverlay(wx, k);
-        if (n > 0) { const t = k.base?.vilage?.time; kmaBase = t ? `${t.slice(0, 2)}:${t.slice(2, 4)}` : "—"; }
+        if (n > 0) kmaBase = hhmm(k.base?.vilage?.time) || "—";
       }
-      const v = { wx, src, kmaBase };
+      const v = { wx, src, kmaBase, kmaUltraBase, sig: tiersSig(tiers), tz: city.tz };
       cachePut(key, v);
       return { ...v, at: Date.now(), stale: false };
     } catch (e) {
@@ -134,7 +185,7 @@ export function getWeather(city, { force = false } = {}) {
     }
   });
 }
-export const peekWeather = (city) => { const c = cacheGet("wx:" + ck(city)); return c ? { ...c.v, at: c.at, stale: !cacheGet("wx:" + ck(city), CACHE_MIN)?.fresh } : null; };
+export const peekWeather = (city) => { const k = wxKey(city), c = cacheGet(k); return c ? { ...c.v, at: c.at, stale: !cacheGet(k, CACHE_MIN)?.fresh } : null; };
 
 /* ---------- 미세먼지 ---------- */
 const pick = (o, ...ks) => { for (const k of ks) { const v = k.split(".").reduce((a, x) => (a == null ? a : a[x]), o); if (v != null && v !== "" && v !== "-" && !isNaN(+v)) return +v; } return null; };

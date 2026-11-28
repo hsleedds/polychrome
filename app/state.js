@@ -1,5 +1,6 @@
 /* 사용자 상태 (localStorage, 로그인 없음). 저장소 접근은 모두 try/catch. */
 import { DEFAULT_CITY, DEFAULT_AURORA_CITIES, MAX_CITIES } from "./config.js";
+import { sanitizeFsrc } from "./sources.js";
 
 export const KEY = "pc:state:v1";
 
@@ -27,6 +28,7 @@ export function defaults(navLang) {
     units: /^en-(US|LR|MM)\b/i.test(navLang || "") ? "imperial" : "metric",
     auroraCities: DEFAULT_AURORA_CITIES.map((c) => ({ ...c })),
     admin: null, // {mark, at} — 토큰 자체는 저장하지 않음
+    fsrc: sanitizeFsrc(null), // SPEC 12 예보 출처 {preset, model, tiers:{now, short, mid}}
   };
 }
 
@@ -61,6 +63,7 @@ export function sanitize(raw, navLang) {
     s.auroraCities = raw.auroraCities.filter(validCity).map(normCity).filter((c) => !seen.has(c.id) && seen.add(c.id)).slice(0, 10);
   }
   if (raw.admin && typeof raw.admin.mark === "string") s.admin = { mark: raw.admin.mark, at: raw.admin.at || 0 };
+  s.fsrc = sanitizeFsrc(raw.fsrc);
   return s;
 }
 
@@ -109,6 +112,12 @@ export function createStore(storage, navLang) {
     },
     removeAurora(id) { s = { ...s, auroraCities: s.auroraCities.filter((c) => c.id !== id) }; save(); },
     setAdmin(a) { s = { ...s, admin: a }; save(); },
+    /** SPEC 12 예보 출처. 일부만 줘도 됨: {preset} · {model} · {tiers:{mid}} */
+    setForecastSource(o) {
+      if (!o || typeof o !== "object") return;
+      const cur = s.fsrc || sanitizeFsrc(null);
+      s = { ...s, fsrc: sanitizeFsrc({ ...cur, ...o, tiers: { ...cur.tiers, ...(o.tiers || {}) } }) }; save();
+    },
   };
   return api;
 }

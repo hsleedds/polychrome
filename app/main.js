@@ -2,7 +2,7 @@
 import { SB_URL, SB_KEY } from "./config.js";
 import { createStore, safeStorage } from "./state.js";
 import { setLang, t } from "./i18n.js";
-import { loadFlags, flag, verifyAdmin } from "./data.js";
+import { loadFlags, flag, verifyAdmin, setSourcePref } from "./data.js";
 import { W } from "./core.js";
 import { renderWeather } from "./ui/weather.js";
 import { renderDetail } from "./ui/detail.js";
@@ -15,6 +15,9 @@ import { toast } from "./ui/dom.js";
 import { icon } from "./icons.js";
 
 const store = createStore(safeStorage(typeof localStorage !== "undefined" ? localStorage : null), navigator.language);
+// SPEC 12 예보 출처: 설정이 바뀌면 데이터 계층에 바로 반영 (캐시 키에 출처 서명이 들어가 새로 불러옴)
+setSourcePref(store.get().fsrc);
+store.subscribe((s) => setSourcePref(s.fsrc));
 
 // WeatherCore 설정 (기상청 함수는 스위치 kma로)
 try { W()?.config?.({ kma: () => flag("kma"), sbUrl: () => SB_URL, sbKey: () => SB_KEY }); } catch (e) { console.warn(e); }

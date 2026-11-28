@@ -22,6 +22,9 @@ export const DEFAULT_FLAGS = Object.freeze({
   // SPEC 11 — 우리 예측(합의 확률·보정 강수량·노을/무지개 판정·오로라 지수) 화면 표시.
   // 기상예보업 등록 전까지 off: 기관 예보를 출처와 함께 그대로, 판정 대신 「조건」만 보여 준다.
   own_forecast: false,
+  // SPEC 12 — 「해외 모델 하나로」·「직접 설정」을 Pro로 잠글지. 테스트 기간(off)에는 누구나 전부 사용.
+  // 켜면 잠금 표시 + 기상청 우선으로 표시 (Pro 결제는 아직 없음 — 잠금 화면만).
+  pro_gate: false,
 });
 
 export const MAX_CITIES = 5;

@@ -3,18 +3,36 @@ import { getWeather, peekWeather, getAir, getModels, peekModels, flag, ownForeca
 import { icon } from "../icons.js";
 import { t, cityName, lang } from "../i18n.js";
 import { esc, actionSheet, onLongPress, toast } from "./dom.js";
-import { buildVM, summaryText, condText, sunsetGlow, nightCloud, isDayAt, primarySrc, cloudSrc } from "./vm.js";
-import { temp, precip, hourLabel, dayLabel, relTime, clockAt, dateToLocal, addDays, ymdOf, pct } from "../format.js";
-import { iconKey, isWet, riseSet, twilight, moonPos, moonPhaseName, hasSky } from "../core.js";
+import { buildVM, summaryText, condText, sunsetGlow, nightCloud, isDayAt, primarySrc, cloudSrc, srcLabel, dailySrcLabel, srcRunsText } from "./vm.js";
+import { temp, precip, hourLabel, dayLabel, relTime, clockAt, dateToLocal, addDays, ymdOf, pct, nowIndex } from "../format.js";
+import { iconKey, isWet, riseSet, twilight, moonPos, moonPhaseName, hasSky, localNow } from "../core.js";
 import { MAX_CITIES } from "../config.js";
 
 /* ================= 조각들 ================= */
+/** 지금 시간의 출처 키 (SPEC 12 이어 붙인 예보면 hourly.src, 아니면 null) */
+export function srcNowOf(res) {
+  const H = res?.wx?.hourly;
+  if (!H || !Array.isArray(H.src)) return null;
+  const tz = res.tz || res.wx.timezone || "UTC";
+  return H.src[nowIndex(H.time, localNow(tz))] || null;
+}
+/** 머리줄 출처 배지: 지금 시간 값의 출처 */
 export function sourceBadge(res) {
   if (!res) return "";
-  const txt = res.kmaBase ? t("src.kma", { time: res.kmaBase }) : res.src === "met" ? t("src.met") : t("src.om");
+  const k = srcNowOf(res);
+  let txt, kma;
+  if (k) {
+    kma = k.startsWith("kma");
+    txt = k === "kma_ultra" ? t("src.kmaUltra", { time: res.kmaUltraBase || res.kmaBase || "—" })
+      : k === "kma_vilage" ? t("src.kmaVilage", { time: res.kmaBase || "—" })
+      : k === "om" ? t("src.om") : k === "met" ? t("src.met") : srcLabel(k);
+  } else {
+    kma = !!res.kmaBase;
+    txt = res.kmaBase ? t("src.kma", { time: res.kmaBase }) : res.src === "met" ? t("src.met") : t("src.om");
+  }
   const age = Math.round((Date.now() - res.at) / 6e4);
   const stale = res.stale ? ` <span class="stale">${esc(t("src.stale", { min: age }))}</span>` : "";
-  return `<span class="badge${res.kmaBase ? " kma" : ""}">${esc(txt)}</span>${stale}`;
+  return `<span class="badge${kma ? " kma" : ""}" title="${esc(t("fsrc.badgeTitle"))}">${esc(txt)}</span>${stale}`;
 }
 
 export function airLine(vm) {
@@ -34,7 +52,7 @@ export function asPublishedNote() { return ownForecast() ? "" : `<p class="as-pu
 
 /** own_forecast off: 주 예보 값 그대로 + 출처, 기관 집계 「N곳 중 M곳」 */
 function rainLineRaw(vm, units) {
-  const r = vm.r24, a = vm.agency, src = srcName(primarySrc(vm.res));
+  const r = vm.r24, a = vm.agency, src = srcRunsText(vm, vm.i, vm.i + 24);
   const cnt = a && a.n >= 2 ? ` · ${esc(t("models.agree", { n: a.n, m: a.m }))}` : "";
   const ic = icon("umbrella", { cls: "sm" });
   if (!r) return cnt ? `<div class="mc-line rain">${ic}<span class="mc-txt">${cnt.slice(3)}</span></div>` : "";
@@ -61,7 +79,7 @@ function mainIcon(vm, cls = "xl") {
 
 /** 메인 카드 (위 1/3) */
 export function mainCardHTML(vm, units, { tappable = true } = {}) {
-  const strip = vm.strip.map((s, k) => `<li class="${s.wet ? "wet" : ""}"><span class="st-t">${k === 0 ? esc(t("now")) : esc(hourLabel(s.time, lang(), true))}</span>${icon(s.icon, { cls: "sm" })}<span class="st-v">${esc(temp(s.temp, units))}</span></li>`).join("");
+  const strip = vm.strip.map((s, k) => `<li class="${s.wet ? "wet" : ""}${k > 0 && s.src && s.src !== vm.strip[k - 1].src ? " src-chg" : ""}"${s.src ? ` title="${esc(srcLabel(s.src))}"` : ""}><span class="st-t">${k === 0 ? esc(t("now")) : esc(hourLabel(s.time, lang(), true))}</span>${icon(s.icon, { cls: "sm" })}<span class="st-v">${esc(temp(s.temp, units))}</span></li>`).join("");
   const attrs = tappable ? ` role="link" tabindex="0" data-href="#/city/${esc(vm.city.id)}" aria-label="${esc(t("a11y.openDetail", { city: cityName(vm.city) }))}"` : "";
   return `<section class="main-card accent"${attrs}>
     <div class="mc-top">${mainIcon(vm)}<div class="mc-temp">${esc(temp(vm.curT, units))}</div>
@@ -71,6 +89,7 @@ export function mainCardHTML(vm, units, { tappable = true } = {}) {
     <p class="mc-sum">${esc(summaryText(vm.sum, vm, units))}</p>
     ${rainLine(vm, units)}${airLine(vm)}
     <ol class="strip" aria-label="${esc(t("a11y.strip"))}">${strip}</ol>
+    ${Array.isArray(vm.H.src) ? `<div class="mc-src">${esc(t("fsrc.basis", { src: srcRunsText(vm, vm.i, vm.i + 3 * (vm.strip.length - 1) + 1) }))}</div>` : ""}
   </section>`;
 }
 
@@ -82,14 +101,18 @@ export function dailyHTML(vm, units, cityId) {
   const mins = [], maxs = [];
   for (let k = 0; k < n; k++) { mins.push(D.temperature_2m_min[vm.di + k]); maxs.push(D.temperature_2m_max[vm.di + k]); }
   const lo = Math.min(...mins.filter((x) => x != null)), hi = Math.max(...maxs.filter((x) => x != null)), span = Math.max(1, hi - lo);
+  let lastSrc = null;
   for (let k = 0; k < n; k++) {
     const d = vm.di + k, ymd = D.time[d];
+    const ds = D.src?.[d] ? dailySrcLabel(D.src[d]) : null;
+    const srcTag = ds && ds !== lastSrc ? `<small class="dr-src"${D.derived?.[d] ? ` title="${esc(t("fsrc.derived"))}"` : ""}>${esc(ds)}</small>` : "";
+    if (ds) lastSrc = ds;
     const pp = D.precipitation_probability_max?.[d], ps = D.precipitation_sum?.[d];
     const wet = isWet(pp, ps);
     const a = (mins[k] - lo) / span, w = Math.max(0.06, (maxs[k] - mins[k]) / span);
     const bg = `background-size:${(100 / w).toFixed(1)}% 100%;background-position:${w >= 1 ? 0 : (a / (1 - w) * 100).toFixed(1)}% 0`;
     rows.push(`<li><a class="day-row${wet ? " wet" : ""}" href="#/city/${esc(cityId)}/day/${ymd}" aria-label="${esc(t("a11y.day", { day: dayLabel(ymd, vm.today, lang()) }))}">
-      <span class="dr-d">${esc(dayLabel(ymd, vm.today, lang()))}</span>
+      <span class="dr-d">${esc(dayLabel(ymd, vm.today, lang()))}${srcTag}</span>
       ${icon(iconKey(D.weather_code?.[d], true, (ps || 0) / 10), { cls: "md" })}
       <span class="dr-rain">${pp != null ? `<b>${esc(pct(pp))}</b>` : ""}${ps > 0 ? `<small>${esc(precip(ps, units))}</small>` : ""}</span>
       <span class="dr-lo">${esc(temp(mins[k], units))}</span>
@@ -106,7 +129,8 @@ export function rainCardHTML(vm, units) {
   const bars = [];
   for (let k = 0; k < 48 && vm.i + k < H.time.length; k++) {
     const j = vm.i + k, mm = H.precipitation?.[j] || 0, wet = isWet(H.precipitation_probability?.[j], mm);
-    bars.push(`<i class="${wet ? "wet" : ""}" style="height:${Math.min(100, 6 + mm * 18).toFixed(0)}%"></i>`);
+    const chg = k > 0 && H.src?.[j] && H.src[j] !== H.src[j - 1];
+    bars.push(`<i class="${wet ? "wet" : ""}${chg ? " chg" : ""}" style="height:${Math.min(100, 6 + mm * 18).toFixed(0)}%"></i>`);
   }
   const lines = [];
   lines.push(`<div class="rc-row"><span>${esc(t("rain.card.start"))}</span><b>${esc(relTime(r.start, vm.now, lang()))}</b></div>`);
@@ -117,7 +141,7 @@ export function rainCardHTML(vm, units) {
   lines.push(`<div class="rc-row"><span>${esc(t("rain.card.prob"))}</span><b>${esc(pct(r.maxProb))}</b></div>`);
   if (!own && vm.agency && vm.agency.n >= 2) lines.push(`<div class="rc-row"><span>${esc(t("rain.card.agencies"))}</span><b>${esc(t("models.agree", { n: vm.agency.n, m: vm.agency.m }))}</b></div>`);
   if (c && c.n >= 2) lines.push(`<div class="rc-row"><span>${esc(t("rain.card.agree"))}</span><b>${esc(t("rain.card.agreeN", { m: Math.round((c.prob ?? 0) / 100 * c.n), n: c.n, grade: t("grade." + (c.grade || "low")) }))}</b></div>`);
-  const srcH = own ? "" : ` <small class="muted">${esc(t("rain.card.basis", { src: srcName(primarySrc(vm.res)) }))}</small>`;
+  const srcH = own ? "" : ` <small class="muted">${esc(t("rain.card.basis", { src: srcRunsText(vm, vm.i, vm.i + 48) }))}</small>`;
   return `<section class="card rain-card"><h3 class="card-h">${icon("umbrella", { cls: "sm" })} ${esc(t("rain.card.title"))}${srcH}</h3>
     <div class="rc-bars" aria-hidden="true">${bars.join("")}</div><div class="rc-axis"><span>${esc(t("now"))}</span><span>+24h</span><span>+48h</span></div>${lines.join("")}</section>`;
 }

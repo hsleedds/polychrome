@@ -59,12 +59,12 @@ const near = (a, b, tolMin, msg) => {
 };
 
 /* ================= 1. 1.0.2 호환 (tz 생략 = 결과 동일) ================= */
-test("VERSION 1.1.0, 기존 export 전부 유지", () => {
-  assert.equal(NEW.VERSION, "1.1.0");
+test("VERSION 1.2.0, 기존 export 전부 유지", () => {
+  assert.equal(NEW.VERSION, "1.2.0");
   assert.equal(OLD.VERSION, "1.0.2");
   for (const k of Object.keys(OLD)) assert.ok(k in NEW, "missing " + k);
   for (const k of ["DOMESTIC", "GLOBAL", "SHOW_GLOBAL", "MET_SYM"]) assert.deepEqual(NEW[k], OLD[k]);
-  assert.match(readFileSync(join(here, "../core/weather-core.js"), "utf8").split("\n")[0], /Polychrome Weather Core v1\.1\.0/);
+  assert.match(readFileSync(join(here, "../core/weather-core.js"), "utf8").split("\n")[0], /Polychrome Weather Core v1\.2\.0/);
 });
 
 test("호환: score/grade/windWord/extreme/extremeDay/isWet/fogLevel/WMO/metCode 무작위 5000건", () => {

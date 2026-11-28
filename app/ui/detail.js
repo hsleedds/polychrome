@@ -3,26 +3,32 @@ import { getModels, peekModels, getAir, getWeather, ownForecast } from "../data.
 import { icon } from "../icons.js";
 import { t, cityName, lang } from "../i18n.js";
 import { esc, header } from "./dom.js";
-import { buildVM, isDayAt, condText, modelsForConsensus } from "./vm.js";
+import { buildVM, isDayAt, condText, modelsForConsensus, srcLabel, srcRunsText, dailySrcLabel } from "./vm.js";
 import { mainCardHTML, dailyHTML, rainCardHTML, lightCardHTML, sourceBadge, asPublishedNote } from "./weather.js";
 import { temp, precip, wind, hourLabel, dayLabel, monthDay, clockAt, pct, compassKey, uvLevel, ymdOf } from "../format.js";
 import { iconKey, isWet, fogLevel, riseSet, consensusFor } from "../core.js";
 
 function hourCols(vm, from, to, units) {
-  const H = vm.H, D = vm.D, cols = [];
+  const H = vm.H, D = vm.D, cols = [], S = H.src;
   for (let j = from; j < to && j < H.time.length; j++) {
+    // SPEC 12: 출처가 바뀌는 곳에 얇은 구분선 「여기부터 ECMWF」
+    if (Array.isArray(S) && j > from && S[j] && S[j] !== S[j - 1]) {
+      const lb = t("fsrc.from", { src: srcLabel(S[j]) });
+      cols.push(`<li class="src-div" role="separator" aria-label="${esc(lb)}"><span>${esc(lb)}</span></li>`);
+    }
     const mm = H.precipitation?.[j] || 0, pp = H.precipitation_probability?.[j];
     const wet = isWet(pp, mm);
     const ik = iconKey(H.weather_code?.[j], isDayAt(H, D, j), mm, H.wind_speed_10m?.[j]);
     const hl = j === vm.i ? t("now") : hourLabel(H.time[j], lang(), true);
     const newDay = H.time[j].endsWith("T00:00") && j !== from;
-    cols.push(`<li class="${wet ? "wet" : ""}${newDay ? " newday" : ""}"${H.kma?.[j] ? ' data-kma="1"' : ""}>
+    cols.push(`<li class="${wet ? "wet" : ""}${newDay ? " newday" : ""}"${H.kma?.[j] ? ' data-kma="1"' : ""}${S?.[j] ? ` data-src="${esc(S[j])}"` : ""}>
       ${newDay ? `<span class="hc-day">${esc(dayLabel(ymdOf(H.time[j]), vm.today, lang()))}</span>` : ""}
       <span class="hc-t">${esc(hl)}</span>${icon(ik, { cls: "sm" })}<span class="hc-v">${esc(temp(H.temperature_2m?.[j], units))}</span>
       <span class="hc-bar" aria-hidden="true"><i style="height:${Math.min(100, mm > 0 ? 8 + mm * 16 : 0).toFixed(0)}%"></i></span>
       <span class="hc-p">${pp != null ? esc(pct(pp)) : ""}</span><span class="hc-mm">${mm > 0 ? esc(precip(mm, units)) : ""}</span></li>`);
   }
-  return `<ol class="hours" aria-label="${esc(t("detail.hourly"))}">${cols.join("")}</ol>`;
+  const basis = Array.isArray(S) ? `<p class="hours-src muted tiny">${esc(t("fsrc.basis", { src: srcRunsText(vm, from, to) }))}</p>` : "";
+  return `<ol class="hours" aria-label="${esc(t("detail.hourly"))}">${cols.join("")}</ol>${basis}`;
 }
 
 function modelName(m) { const k = "model." + m.name; return t.has(k) ? t(k) : m.name || m.id; }
@@ -90,6 +96,7 @@ function dayHTML(vm, ymd, units) {
       <div>${esc(t("hilo", { hi: temp(D.temperature_2m_max?.[d], units), lo: temp(D.temperature_2m_min?.[d], units) }))}</div></div></div>
       <div class="dh-rain">${icon("umbrella", { cls: "sm" })} ${esc(pct(pp))} · ${esc(precip(ps ?? 0, units))}</div>
       <div class="muted">${esc(t("sunrise"))} ${esc(clockAt(rs?.rise, c.tz))} · ${esc(t("sunset"))} ${esc(clockAt(rs?.set, c.tz))}</div>
+      ${D.src?.[d] ? `<div class="muted tiny">${esc(t("fsrc.basis", { src: dailySrcLabel(D.src[d]) }))}${D.derived?.[d] ? ` · ${esc(t("fsrc.derived"))}` : ""}</div>` : ""}
     </section>
     <section class="card"><h3 class="card-h">${esc(t("detail.dayHourly"))}</h3>${from < 0 ? `<p class="muted">${esc(t("error.noDay"))}</p>` : hourCols(vm, Math.max(0, start), from + 24, units)}</section>`;
 }
@@ -109,7 +116,7 @@ export async function renderDetail(root, ctx, cityId, dayYmd) {
     const vm = buildVM(city, res, air, models);
     if (dayYmd) { body.innerHTML = dayHTML(vm, dayYmd, units) + dailyHTML(vm, units, city.id) + asPublishedNote(); return; }
     body.innerHTML = mainCardHTML(vm, units, { tappable: false }) +
-      `<section class="card"><h3 class="card-h">${esc(t("detail.hourly"))}${res.kmaBase ? ` <small class="muted">${esc(t("detail.kmaNote"))}</small>` : ""}</h3>${hourCols(vm, vm.i, vm.i + 24, units)}</section>` +
+      `<section class="card"><h3 class="card-h">${esc(t("detail.hourly"))}${res.kmaBase && !Array.isArray(res.wx.hourly.src) ? ` <small class="muted">${esc(t("detail.kmaNote"))}</small>` : ""}</h3>${hourCols(vm, vm.i, vm.i + 24, units)}</section>` +
       dailyHTML(vm, units, city.id) + (vm.r48?.wet ? rainCardHTML(vm, units) : "") + modelsHTML(vm, units) + lifeHTML(vm, units) + lightCardHTML(vm, units) + asPublishedNote();
   };
   draw();
@@ -119,4 +126,4 @@ export async function renderDetail(root, ctx, cityId, dayYmd) {
     else { const mb = body.querySelector(".models-body"); if (mb) mb.innerHTML = `<span class="muted">${esc(t("models.none"))}</span>`; }
   });
 }
-export { modelsForConsensus, consensusFor };
+export { modelsForConsensus, consensusFor, hourCols };
