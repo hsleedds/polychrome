@@ -155,3 +155,12 @@ test("silhouette-calc: 탑 — 비스듬한 옆면을 지날 때는 「꼭대기
   const w = overlapWindows(sil, top).windows;
   assert.equal(w.length, 1); assert.ok(w[0].end - w[0].start <= 15 * 60e3, "짧은 구간");
 });
+
+test("silhouette: 지평선 아래로 완전히 진 뒤는 화면 안 구간에서 제외", async () => {
+  const { viewWindows } = await import("../app/silhouette-calc.js");
+  const view = { inside: () => true };
+  const samples = [0, 1, 2, 3, 4, 5].map((i) => ({ t: i * 60e3, az: 270, alt: 2 - i, diamDeg: 0.5 }));
+  const vis = (s) => s.alt + 0.25 > 0; // 능선 0°
+  const w = viewWindows(samples, view, -2, vis);
+  if (w.length !== 1 || w[0].end !== 2 * 60e3) throw new Error(JSON.stringify(w));
+});

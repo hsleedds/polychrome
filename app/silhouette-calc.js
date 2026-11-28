@@ -153,16 +153,16 @@ export function hourTicks(samples, localMin, minAlt = -2) {
 }
 
 /** 원반 중심이 화면(창) 안에 있는 연속 구간 [{start, end}] (지평선 minAlt 위만) */
-export function viewWindows(samples, view, minAlt = -2) {
-  return runs(samples, (s) => s.alt > minAlt && view.inside(s.az, s.alt));
+export function viewWindows(samples, view, minAlt = -2, visible = null) {
+  return runs(samples, (s) => s.alt > minAlt && view.inside(s.az, s.alt) && (!visible || visible(s)));
 }
 
 /** 궤적을 화면 점들로: 지평선 아래·창 밖·방위 0/360 건너뛰기에서 끊는다. 반환 [[[x,y],...], ...]
  *  strict=true 면 화면 안(view.inside) 표본만 (궤적은 「화면 안」 구간에서만 그림) */
-export function pathSegments(samples, view, minAlt = -2, { strict = false } = {}) {
+export function pathSegments(samples, view, minAlt = -2, { strict = false, visible = null } = {}) {
   const segs = []; let cur = null, prevAz = null;
   for (const s of samples) {
-    const okAlt = s.alt > minAlt, d = wrap180(s.az - view.azC);
+    const okAlt = s.alt > minAlt && (!visible || visible(s)), d = wrap180(s.az - view.azC);
     const inWin = strict ? view.inside(s.az, s.alt) : Math.abs(d) <= view.azHalf + 5;
     const jump = prevAz != null && Math.abs(d - prevAz) > 90;
     prevAz = d;

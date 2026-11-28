@@ -276,6 +276,12 @@ export async function renderSilhouette(root, ctx) {
 
   /* ---- 정적 그림 ---- */
   let V = null;
+  /** 해·달 원반이 지형(없으면 바다 지평선) 아래로 완전히 넘어가면 false — 그 뒤 궤적·시간 막대는 숨김 (HS 2026-11-28) */
+  function notSet(s) {
+    const r = (s.diamDeg || 0.53) / 2;
+    const h = terr ? horizonAt(terr, s.az) : (M && isFinite(M.dip) ? M.dip : null);
+    return h == null || s.alt + r > h;
+  }
   function drawStatic() {
     const { sil, samples, lm } = M;
     V = makeView({ ...windowFor(), W, H });
@@ -318,7 +324,7 @@ export async function renderSilhouette(root, ctx) {
     const d = sil.polygons.map((poly) => "M" + poly.map(([az, alt]) => `${f1(V.x(az))} ${f1(V.y(alt))}`).join("L") + "Z").join("");
     parts.push(`<path d="${d}" class="sil-lm"/>`);
     // 궤적 (점선) + 정시 눈금
-    const segs = pathSegments(samples, V, MIN_ALT, { strict: true }); // 화면 안 구간만
+    const segs = pathSegments(samples, V, MIN_ALT, { strict: true, visible: notSet }); // 화면 안 구간만
     parts.push(segs.map((s) => `<polyline points="${s.map((p) => p.map(f1).join(",")).join(" ")}" class="sil-path ${P.body}"/>`).join(""));
     const lmin = (ms) => { const s = dateToLocal(new Date(ms), TZ); return +s.slice(11, 13) * 60 + +s.slice(14, 16); };
     let lastX = -1e9, lastY = -1e9;
@@ -434,7 +440,7 @@ export async function renderSilhouette(root, ctx) {
     if (res.err) { M = null; chart.innerHTML = ""; readEl.innerHTML = ""; inviewEl.textContent = ""; sumEl.textContent = t(res.err); notesEl.innerHTML = ""; startFinder(); return; }
     M = res;
     drawStatic(); // 창(V) 먼저 → 화면 안 구간
-    M.inView = viewWindows(M.samples, V, MIN_ALT);
+    M.inView = viewWindows(M.samples, V, MIN_ALT, notSet);
     // 슬라이더 범위: 화면 안 구간 (한 번도 안 들어오면 지평선 −2° 위 구간, 그것도 없으면 하루 전체)
     const [a, b] = M.inView.length ? [M.inView[0].start, M.inView[M.inView.length - 1].end] : M.span || [M.t0, M.t1 - 60e3];
     M.range = [a, b];
