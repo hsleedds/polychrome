@@ -342,3 +342,31 @@ ul.plain { margin: 0; padding-left: 18px; font-size: 14px; }
 @media (max-width: 360px) { .sil-row2 { grid-template-columns: 1fr; } .sil-row3 { grid-template-columns: 1fr 1fr; } }
 .sil-off { fill-opacity: .9; } .sil-off.sun { fill: #ffd36a; } .sil-off.moon { fill: #fbf3d2; }
 .sil-off-arr { fill: #fff; fill-opacity: .9; }
+/* 겹치는 날짜 */
+.sil-find { padding: 12px; }
+.sil-find-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0 4px; }
+.sil-find-head .card-h { margin: 0; font-size: 16px; }
+.sil-find-body { flex: 1 1 210px; max-width: 320px; }
+.sil-find .seg button { min-height: 44px; }
+.sil-find-rule { margin: 8px 4px; line-height: 1.45; }
+.sil-find-prog { display: flex; align-items: center; gap: 10px; margin: 6px 4px; }
+.sil-find-prog[hidden] { display: none; }
+.sil-find-prog progress { flex: 1; min-width: 0; height: 8px; accent-color: var(--navy-2); }
+.sil-find-n { margin: 4px 4px 6px; }
+.sil-find-ul, .sil-find-ul ul { list-style: none; margin: 0; padding: 0; }
+.sil-fg { margin: 0 0 6px; }
+.sil-fg:has(.sil-fg-h) { border-left: 3px solid var(--line); padding-left: 6px; }
+.sil-fg-h { display: block; margin: 2px 4px; }
+.sil-fr { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; min-height: 48px; padding: 8px 10px; margin: 0 0 4px; border-radius: 10px;
+  background: var(--bg); color: var(--text); text-align: left; font: inherit; box-shadow: inset 0 0 0 1px var(--line); }
+.sil-fr.on { box-shadow: inset 0 0 0 2px var(--rain); background: var(--rain-soft); }
+.sil-fr-d { font-weight: 700; font-size: 15px; min-width: 0; }
+.sil-fr-t { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; text-align: right; }
+.sil-fr-x { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.sil-fg-more { display: block; width: 100%; min-height: 44px; margin: 0 0 4px; border-radius: 10px; font: inherit; font-size: 13px; color: var(--rain); background: transparent; border: 1px dashed var(--line); }
+.sil-find-more { width: 100%; justify-content: center; min-height: 44px; margin-top: 4px; }
+.sil-find-empty { margin: 6px 4px 2px; font-weight: 700; }
+.sil-inview { margin: -6px 4px 10px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.sil-inview:empty { display: none; }
+.sil-now[hidden] { display: none; }
+.sil-card { scroll-margin-top: 64px; }

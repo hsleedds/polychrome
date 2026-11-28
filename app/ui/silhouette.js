@@ -8,8 +8,9 @@ import { dateToLocal, localToDate, addDays } from "../format.js";
 import { safeStorage } from "../state.js";
 import {
   makeView, chooseWindow, samplePath, aboveSpan, overlapWindows, runs, moonLitPath, phaseRotation,
-  lensFov, hourTicks, pathSegments, worstState, horizonState, unwrapAz, wrap180,
+  lensFov, hourTicks, pathSegments, worstState, horizonState, unwrapAz, wrap180, viewWindows,
 } from "../silhouette-calc.js";
+import { createScan, skyState, groupDays, scanKey } from "../align-finder.js";
 
 /* 서울 랜드마크만 있으므로 시간대는 서울 고정 (다른 나라 구조물이 생기면 landmark.tz 로) */
 const TZ = "Asia/Seoul";
@@ -89,6 +90,8 @@ function loadLibrary() {
   }
   return libP;
 }
+const findCache = new Map(); // scanKey → 겹치는 창 목록 (같은 구조물·위치·눈높이·천체·시작일이면 다시 계산 안 함)
+const FIND_DAYS = 365, FIND_SHOW = 8; // 처음 보이는 줄 수 (긴 연속 묶음은 처음·마지막만)
 const terrainCache = new Map(); // "lat,lon,eye" → Promise<profile|null>
 function loadTerrain(lat, lon, eyeM) {
   const T = TC(); if (!T) return null;
@@ -158,6 +161,7 @@ export async function renderSilhouette(root, ctx) {
   };
   if (P.lat == null || P.lon == null) { const p = (PRESETS[P.id] || [])[0]; if (p) { P.lat = p.lat; P.lon = p.lon; P.preset = 0; } }
   let M = null; // 계산 결과
+  let focusWin = null; // 「겹치는 날짜」에서 고른 창 {ymd, body, start, end}
   let tMs = null; // 슬라이더 시각
   let playing = false, raf = 0, lastTs = 0;
   let terr = null, terrState = "none"; // none | loading | ok | fail
@@ -188,8 +192,22 @@ export async function renderSilhouette(root, ctx) {
         <p class="muted tiny">${esc(t("sil.presetNote"))}</p>
       </fieldset>
     </section>
+    <section class="card sil-find" aria-labelledby="sil-find-h">
+      <div class="sil-find-head">
+        <h3 class="card-h" id="sil-find-h">${esc(t("sil.find"))}</h3>
+        <div class="seg sil-find-body" role="group" aria-label="${esc(t("sil.findBody"))}">
+          <button type="button" data-fbody="sun">☀︎ ${esc(t("sil.sun"))}</button>
+          <button type="button" data-fbody="moon">☾ ${esc(t("sil.moon"))}</button>
+          <button type="button" data-fbody="both">${esc(t("sil.findBoth"))}</button>
+        </div>
+      </div>
+      <p class="muted tiny sil-find-rule">${esc(t("sil.findRule"))}</p>
+      <div class="sil-find-prog" hidden><progress max="100" value="0"></progress><span class="tiny muted"></span></div>
+      <div class="sil-find-list" aria-live="polite"></div>
+    </section>
     <section class="card sil-card">
       <p class="sil-sum" aria-live="polite"></p>
+      <p class="sil-inview muted"></p>
       <div class="sil-chart"></div>
       <div class="sil-time">
         <button type="button" class="icon-btn sil-play" aria-label="${esc(t("sil.play"))}"><span aria-hidden="true">▶</span></button>
@@ -209,7 +227,7 @@ export async function renderSilhouette(root, ctx) {
     </section>`;
 
   const $ = (s) => body.querySelector(s);
-  const chart = $(".sil-chart"), sumEl = $(".sil-sum"), range = $("#sil-t"), clock = $(".sil-clock"), readEl = $(".sil-read"), notesEl = $(".sil-notes"), playBtn = $(".sil-play"), nowBtn = $(".sil-now");
+  const chart = $(".sil-chart"), sumEl = $(".sil-sum"), inviewEl = $(".sil-inview"), findList = $(".sil-find-list"), findProg = $(".sil-find-prog"), range = $("#sil-t"), clock = $(".sil-clock"), readEl = $(".sil-read"), notesEl = $(".sil-notes"), playBtn = $(".sil-play"), nowBtn = $(".sil-now");
 
   /* ---- 계산 ---- */
   function compute() {
@@ -249,6 +267,10 @@ export async function renderSilhouette(root, ctx) {
     // 「구조물 맞춤」: 가까이 지날 때만 궤적까지 담는다 (멀면 구조물이 너무 작아짐 → 「넓게」로)
     if (c && Math.abs(c.dAz) <= Math.max(4, 3 * sil.angularWidthDeg)) focus.push({ az: c.az, alt: c.alt, r: 0.6 });
     for (const w of ov.windows.slice(0, 1)) { const s = sampleAt(w.start), e = sampleAt(w.end); focus.push({ az: s.az, alt: s.alt, r: s.diamDeg }, { az: e.az, alt: e.alt, r: e.diamDeg }); }
+    // 「겹치는 날짜」에서 고른 창은 꼭 화면에 담는다
+    if (focusWin && focusWin.ymd === P.date && focusWin.body === P.body) {
+      for (const tt of [focusWin.start, focusWin.end]) { const s = sampleAt(tt); if (s.alt > MIN_ALT) focus.push({ az: s.az, alt: s.alt, r: s.diamDeg }); }
+    }
     return chooseWindow(sil, { mode: P.zoom, focus, aspect: H / W, horizonAlt: hz != null ? Math.min(hz, 0) : 0 });
   }
 
@@ -296,7 +318,7 @@ export async function renderSilhouette(root, ctx) {
     const d = sil.polygons.map((poly) => "M" + poly.map(([az, alt]) => `${f1(V.x(az))} ${f1(V.y(alt))}`).join("L") + "Z").join("");
     parts.push(`<path d="${d}" class="sil-lm"/>`);
     // 궤적 (점선) + 정시 눈금
-    const segs = pathSegments(samples, V, MIN_ALT);
+    const segs = pathSegments(samples, V, MIN_ALT, { strict: true }); // 화면 안 구간만
     parts.push(segs.map((s) => `<polyline points="${s.map((p) => p.map(f1).join(",")).join(" ")}" class="sil-path ${P.body}"/>`).join(""));
     const lmin = (ms) => { const s = dateToLocal(new Date(ms), TZ); return +s.slice(11, 13) * 60 + +s.slice(14, 16); };
     let lastX = -1e9, lastY = -1e9;
@@ -409,14 +431,17 @@ export async function renderSilhouette(root, ctx) {
     savePrefs(P);
     let res;
     try { res = compute(); } catch (e) { console.warn(e); res = { err: "error.render" }; }
-    if (res.err) { M = null; chart.innerHTML = ""; readEl.innerHTML = ""; sumEl.textContent = t(res.err); notesEl.innerHTML = ""; return; }
+    if (res.err) { M = null; chart.innerHTML = ""; readEl.innerHTML = ""; inviewEl.textContent = ""; sumEl.textContent = t(res.err); notesEl.innerHTML = ""; startFinder(); return; }
     M = res;
-    // 슬라이더 범위: 지평선 −2° 위 구간 (없으면 하루 전체)
-    const [a, b] = M.span || [M.t0, M.t1];
+    drawStatic(); // 창(V) 먼저 → 화면 안 구간
+    M.inView = viewWindows(M.samples, V, MIN_ALT);
+    // 슬라이더 범위: 화면 안 구간 (한 번도 안 들어오면 지평선 −2° 위 구간, 그것도 없으면 하루 전체)
+    const [a, b] = M.inView.length ? [M.inView[0].start, M.inView[M.inView.length - 1].end] : M.span || [M.t0, M.t1 - 60e3];
+    M.range = [a, b];
     range.min = String(Math.round((a - M.t0) / 60e3)); range.max = String(Math.round((b - M.t0) / 60e3));
-    range.disabled = !M.span; playBtn.disabled = !M.span;
-    const isToday = P.date === todayYmd();
-    nowBtn.hidden = !isToday;
+    range.disabled = !M.span || a === b; playBtn.disabled = range.disabled;
+    const isToday = P.date === todayYmd(), nowMs = Math.floor(Date.now() / 60e3) * 60e3;
+    nowBtn.hidden = !(isToday && nowMs >= a && nowMs <= b);
     if (!keepTime || tMs == null || tMs < a || tMs > b) {
       // 처음 시각: 겹치는 순간 → (오늘이면) 지금 → 가장 가까운 때
       const now = Date.now(), mid = (w) => Math.round((w.start + w.end) / 2 / 60e3) * 60e3;
@@ -426,11 +451,115 @@ export async function renderSilhouette(root, ctx) {
       else if (M.ov.closest) tMs = M.ov.closest.t;
       else tMs = a;
     }
-    tMs = M.t0 + idxOf(tMs) * 60e3;
-    drawStatic(); drawDynamic();
+    tMs = Math.min(b, Math.max(a, M.t0 + idxOf(tMs) * 60e3));
+    drawDynamic();
     sumEl.textContent = summaryText();
+    inviewEl.textContent = M.inView.length ? t("sil.inView", { when: M.inView.map(span2).join(", ") }) : t("sil.inViewNone");
     notes();
     maybeTerrain();
+    startFinder();
+  }
+
+  /* ---- 겹치는 날짜 찾기 (앞으로 12개월, 조각 실행·취소·캐시) ---- */
+  const F = { body: null, key: "", gen: 0, timer: 0, rows: [], all: false, open: new Set() };
+  const fBody = () => F.body || P.body;
+  const keyFor = (b) => scanKey({ id: P.id, lat: P.lat, lon: P.lon, eye: P.eye, groundM: M.groundM, terrain: !!terr, body: b, from: todayYmd() });
+  function finderSeg() {
+    body.querySelectorAll("[data-fbody]").forEach((x) => { const on = x.dataset.fbody === fBody(); x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
+  }
+  function cancelFinder() { F.gen++; clearTimeout(F.timer); F.key = ""; findProg.hidden = true; }
+  function startFinder() {
+    finderSeg();
+    if (!M) { cancelFinder(); findList.innerHTML = ""; return; }
+    if (terrState === "loading") { // 지형이 오면 결과가 바뀌므로 기다린다
+      cancelFinder(); findProg.hidden = false; findProg.querySelector("progress").removeAttribute("value");
+      findProg.querySelector("span").textContent = t("sil.terrainLoading"); findList.innerHTML = ""; return;
+    }
+    const bodies = fBody() === "both" ? ["sun", "moon"] : [fBody()];
+    const keys = bodies.map(keyFor), key = keys.join("+");
+    if (key === F.key) { markActive(); return; } // 이미 계산 중이거나 끝남
+    cancelFinder(); F.key = key; F.all = false; F.open.clear();
+    const gen = F.gen, sil = M.sil, groundM = M.groundM, tr = terr, lat = P.lat, lon = P.lon, eye = P.eye;
+    const t0 = localToDate(todayYmd() + "T00:00", TZ).getTime(), t1 = t0 + FIND_DAYS * 864e5;
+    const todo = bodies.map((b, i) => [b, keys[i]]).filter(([, k]) => !findCache.has(k));
+    let i = 0, sc = null;
+    const prog = findProg.querySelector("progress"), progT = findProg.querySelector("span");
+    const tick = () => {
+      if (gen !== F.gen || !root.isConnected) return;
+      while (i < todo.length) {
+        const [b, k] = todo[i];
+        if (!sc) sc = createScan({ sil, pos: bodyFn(b, lat, lon, groundM + eye), t0, t1, horizon: tr ? (az) => horizonAt(tr, az) : null });
+        if (!sc.step(12)) {
+          const pc = Math.round((i + sc.progress()) / todo.length * 100);
+          findProg.hidden = false; prog.value = pc; progT.textContent = t("sil.findProg", { v: pc });
+          F.timer = setTimeout(tick, 0); return;
+        }
+        findCache.set(k, sc.result().map((w) => ({ ...w, body: b })));
+        i++; sc = null;
+      }
+      findProg.hidden = true;
+      F.rows = bodies.flatMap((b, j) => findCache.get(keys[j])).sort((x, y) => x.start - y.start);
+      renderFinder();
+    };
+    if (todo.length) { findList.innerHTML = ""; findProg.hidden = false; prog.value = 0; progT.textContent = t("sil.findProg", { v: 0 }); F.timer = setTimeout(tick, 30); }
+    else tick();
+  }
+  const dfmt = (ms) => {
+    const sameYear = dateToLocal(new Date(ms), TZ).slice(0, 4) === todayYmd().slice(0, 4);
+    return new Intl.DateTimeFormat(lang() === "en" ? "en-US" : "ko-KR", { timeZone: TZ, month: "short", day: "numeric", weekday: "short", ...(sameYear ? {} : { year: "numeric" }) }).format(new Date(ms));
+  };
+  function rowHtml(w, i, both) {
+    const ymd = dateToLocal(new Date(w.start), TZ).slice(0, 10);
+    const tags = [t("sil.where." + w.where), t("sil.minAlt", { v: fix(w.minAlt) })];
+    const mid = new Date(w.mid);
+    if (w.body === "moon") {
+      const m = bodyFn("moon", P.lat, P.lon, (M?.groundM || 0) + P.eye)(mid);
+      const sa = sunPos(mid, P.lat, P.lon);
+      tags.push(`${t(moonPhaseName(m.phase))} ${Math.round(m.illum * 100)}%`, t("sil.sky." + skyState(sa.altApparent ?? sa.alt)));
+    } else tags.push(t(w.rising ? "sil.sunRiseSide" : "sil.sunSetSide"));
+    const on = ymd === P.date && w.body === P.body;
+    return `<li><button type="button" class="sil-fr${on ? " on" : ""}" data-fi="${i}" data-ymd="${ymd}" data-b="${w.body}">
+      <span class="sil-fr-d">${both ? `<span aria-hidden="true">${w.body === "sun" ? "☀︎" : "☾"}</span> ` : ""}${esc(dfmt(w.start))}</span>
+      <span class="sil-fr-t">${esc(span2(w))}</span>
+      <span class="sil-fr-x">${tags.map(esc).join(" · ")}</span></button></li>`;
+  }
+  function renderFinder() {
+    const rows = F.rows.map((w, i) => ({ ...w, i, ymd: dateToLocal(new Date(w.start), TZ).slice(0, 10) }));
+    if (!rows.length) {
+      findList.innerHTML = `<p class="sil-find-empty">${esc(t("sil.findNone"))}</p><p class="muted tiny">${esc(t("sil.findNoneHint"))}</p>`;
+      return;
+    }
+    const both = fBody() === "both";
+    const groups = groupDays(rows, addDays);
+    let shown = 0, covered = 0, html = "";
+    for (const g of groups) {
+      if (!F.all && shown >= FIND_SHOW) break;
+      const days = new Set(g.map((r) => r.ymd)).size;
+      // 4줄 넘는 연속 묶음은 첫 줄·마지막 줄만, 가운데는 펼치기 버튼
+      const gk = g[0].i, fold = g.length > 3 && !F.open.has(gk);
+      const inner = fold
+        ? rowHtml(g[0], g[0].i, both) + `<li><button type="button" class="sil-fg-more" data-fg="${gk}" aria-expanded="false">${esc(t("sil.findMid", { n: g.length - 2 }))}</button></li>` + rowHtml(g[g.length - 1], g[g.length - 1].i, both)
+        : g.map((r) => rowHtml(r, r.i, both)).join("");
+      html += `<li class="sil-fg">${days > 1 ? `<span class="sil-fg-h tiny muted">${esc(t("sil.findRun", { n: days }))}</span>` : ""}<ul>${inner}</ul></li>`;
+      shown += fold ? 2 : g.length; covered += g.length;
+    }
+    const more = rows.length - covered;
+    findList.innerHTML = `<p class="tiny muted sil-find-n">${esc(t("sil.findCount", { n: rows.length }))}</p><ul class="sil-find-ul">${html}</ul>` +
+      (more > 0 ? `<button type="button" class="btn ghost sil-find-more">${esc(t("sil.findMore", { n: more }))}</button>` : "");
+  }
+  function markActive() {
+    findList.querySelectorAll(".sil-fr").forEach((x) => x.classList.toggle("on", x.dataset.ymd === P.date && x.dataset.b === P.body));
+  }
+  function pickRow(w) {
+    stop();
+    const ymd = dateToLocal(new Date(w.start), TZ).slice(0, 10);
+    focusWin = { ymd, body: w.body, start: w.start, end: w.end };
+    if (P.body !== w.body) { P.body = w.body; const bb = body.querySelector(`[data-body="${w.body}"]`); if (bb) segOn(bb, "body"); }
+    P.date = ymd; $("#sil-date").value = ymd;
+    refresh();
+    if (M) { tMs = Math.min(M.range[1], Math.max(M.range[0], w.mid)); drawDynamic(); }
+    markActive();
+    body.querySelector(".sil-card")?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
   function maybeTerrain() {
@@ -453,8 +582,8 @@ export async function renderSilhouette(root, ctx) {
     playBtn.innerHTML = `<span aria-hidden="true">▶</span>`; playBtn.setAttribute("aria-label", t("sil.play"));
   }
   function play() {
-    if (!M?.span) return;
-    const [a, b] = M.span;
+    if (!M?.span || !M.range) return;
+    const [a, b] = M.range;
     if (tMs >= b) tMs = a;
     playing = true; lastTs = 0;
     playBtn.innerHTML = `<span aria-hidden="true">❚❚</span>`; playBtn.setAttribute("aria-label", t("sil.pause"));
@@ -489,8 +618,12 @@ export async function renderSilhouette(root, ctx) {
       const p = PRESETS[P.id][+b.dataset.preset]; if (!p) return;
       P.preset = +b.dataset.preset; P.lat = p.lat; P.lon = p.lon; $("#sil-lat").value = p.lat; $("#sil-lon").value = p.lon;
       $(".sil-presets").innerHTML = presetBtns(); refresh({ keepTime: true });
-    } else if (b === playBtn) { playing ? stop() : play(); }
-    else if (b === nowBtn) { stop(); const now = Math.floor(Date.now() / 60e3) * 60e3; if (M && now >= M.t0 && now < M.t1) { tMs = now; drawDynamic(); } }
+    } else if (b.dataset.fbody) { F.body = b.dataset.fbody; startFinder(); }
+    else if (b.dataset.fi != null) { const w = F.rows[+b.dataset.fi]; if (w) pickRow(w); }
+    else if (b.dataset.fg != null) { F.open.add(+b.dataset.fg); renderFinder(); }
+    else if (b.classList.contains("sil-find-more")) { F.all = true; renderFinder(); }
+    else if (b === playBtn) { playing ? stop() : play(); }
+    else if (b === nowBtn) { stop(); const now = Math.floor(Date.now() / 60e3) * 60e3; if (M && now >= M.range[0] && now <= M.range[1]) { tMs = now; drawDynamic(); } }
   });
   const segOn = (b, k) => b.parentElement.querySelectorAll(`[data-${k}]`).forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
   const onPos = () => {
