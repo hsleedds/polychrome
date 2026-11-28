@@ -10,7 +10,7 @@ import {
   makeView, chooseWindow, samplePath, aboveSpan, overlapWindows, runs, moonLitPath, phaseRotation,
   lensFov, hourTicks, pathSegments, worstState, horizonState, unwrapAz, wrap180, viewWindows,
 } from "../silhouette-calc.js";
-import { createScan, skyState, groupDays, scanKey } from "../align-finder.js";
+import { createScan, skyState, groupDays, scanKey, alignBand, bandHit } from "../align-finder.js";
 
 /* 서울 랜드마크만 있으므로 시간대는 서울 고정 (다른 나라 구조물이 생기면 landmark.tz 로) */
 const TZ = "Asia/Seoul";
@@ -253,7 +253,10 @@ export async function renderSilhouette(root, ctx) {
       occ.set(s.t, LC().occlusion(sil, { az: s.az, alt: s.alt, diamDeg: s.diamDeg }).state);
     }
     const behind = runs(samples, (s) => occ.get(s.t) && occ.get(s.t) !== "clear");
-    return { lm, sil, samples, span, ov, occ, behind, t0, t1, groundM, groundSrc, dKm };
+    // 「겹침」 = 상단 1/3 ~ 꼭대기 위 5° (겹치는 날짜와 같은 기준). 그 아래로만 지나가면 겹침으로 보지 않음 (HS 2026-11-28)
+    const band = alignBand(sil);
+    const good = runs(samples, (s) => s.alt > MIN_ALT && notSet(s) && !!bandHit(band, s.az, s.alt, s.diamDeg / 2));
+    return { lm, sil, samples, span, ov, occ, behind, band, good, t0, t1, groundM, groundSrc, dKm };
   }
 
   const idxOf = (ms) => Math.max(0, Math.min(M.samples.length - 1, Math.round((ms - M.t0) / 60e3)));
@@ -266,7 +269,7 @@ export async function renderSilhouette(root, ctx) {
     const c = ov.closest;
     // 「구조물 맞춤」: 가까이 지날 때만 궤적까지 담는다 (멀면 구조물이 너무 작아짐 → 「넓게」로)
     if (c && Math.abs(c.dAz) <= Math.max(4, 3 * sil.angularWidthDeg)) focus.push({ az: c.az, alt: c.alt, r: 0.6 });
-    for (const w of ov.windows.slice(0, 1)) { const s = sampleAt(w.start), e = sampleAt(w.end); focus.push({ az: s.az, alt: s.alt, r: s.diamDeg }, { az: e.az, alt: e.alt, r: e.diamDeg }); }
+    for (const w of M.good.slice(0, 1)) { const s = sampleAt(w.start), e = sampleAt(w.end); focus.push({ az: s.az, alt: s.alt, r: s.diamDeg }, { az: e.az, alt: e.alt, r: e.diamDeg }); }
     // 「겹치는 날짜」에서 고른 창은 꼭 화면에 담는다
     if (focusWin && focusWin.ymd === P.date && focusWin.body === P.body) {
       for (const tt of [focusWin.start, focusWin.end]) { const s = sampleAt(tt); if (s.alt > MIN_ALT) focus.push({ az: s.az, alt: s.alt, r: s.diamDeg }); }
@@ -373,11 +376,16 @@ export async function renderSilhouette(root, ctx) {
       if (up && V.inside(s.az, s.alt, r * 2)) {
         const x = V.x(s.az), y = V.y(s.alt), R = Math.max(r * V.k, 1.5), sw = Math.max(2.5, Math.min(6, R * 0.12));
         const tr = `transform="translate(${f1(x)} ${f1(y)})"`;
+        const ring = `<g ${tr}><circle r="${f1(R + sw / 2)}" class="sil-ring ${state}" stroke-width="${f1(sw)}"/>${R < 14 ? `<circle r="${f1(R + 18)}" class="sil-ring ${state} far"/>` : ""}</g>`;
         if (P.body === "moon") {
-          const rot = phaseRotation(s.brightLimb, s.parallactic);
-          back = `<g ${tr}><circle r="${f1(R)}" class="sil-moon-dark"/><path d="${moonLitPath(R, s.illum)}" transform="rotate(${f1(rot)})" class="sil-moon-lit"/></g>`;
-        } else back = `<g ${tr}><circle r="${f1(R)}" fill="url(#sil-sun)" class="sil-sun"/></g>`;
-        front = `<g ${tr}><circle r="${f1(R + sw / 2)}" class="sil-ring ${state}" stroke-width="${f1(sw)}"/>${R < 14 ? `<circle r="${f1(R + 18)}" class="sil-ring ${state} far"/>` : ""}</g>`;
+          const rot = phaseRotation(s.brightLimb, s.parallactic), lit = moonLitPath(R, s.illum);
+          if (s.illum >= 0.97) { back = `<g ${tr}><path d="${lit}" transform="rotate(${f1(rot)})" class="sil-moon-lit"/></g>`; front = ring; }
+          else {
+            // 보름달이 아니면 둥근 윤곽선 없이 밝은 부분만, 가림 색은 그 모양의 테두리로 (HS 2026-11-28)
+            back = `<g ${tr}><path d="${lit}" transform="rotate(${f1(rot)})" class="sil-moon-lit"/></g>`;
+            front = `<g ${tr}><path d="${lit}" transform="rotate(${f1(rot)})" class="sil-ring ${state}" stroke-width="${f1(Math.max(2, sw * 0.6))}" stroke-linejoin="round"/></g>`;
+          }
+        } else { back = `<g ${tr}><circle r="${f1(R)}" fill="url(#sil-sun)" class="sil-sun"/></g>`; front = ring; }
       } else if (up) {
         // 창 밖: 가장자리에 방향 표시(작은 원 + 화살촉)
         const x = V.x(s.az), y = V.y(s.alt), cx = Math.min(W - 34, Math.max(34, x)), cy = Math.min(H - 34, Math.max(34, y));
@@ -403,15 +411,11 @@ export async function renderSilhouette(root, ctx) {
   }
 
   function summaryText() {
-    const { ov, span, behind } = M;
+    const { ov, span, good } = M;
     if (!span) return t("sil.sumDown." + P.body);
-    if (ov.windows.length) {
-      const w = ov.windows[0];
-      return t("sil.sumPass." + P.body, { when: span2(w) }) + (ov.windows.length > 1 ? t("sil.sumMore", { n: ov.windows.length - 1 }) : "");
-    }
-    if (behind.length) {
-      const w = behind[0];
-      return t("sil.sumBehind." + P.body, { when: span2(w) }) + (behind.length > 1 ? t("sil.sumMore", { n: behind.length - 1 }) : "");
+    if (good.length) {
+      const w = good[0];
+      return t("sil.sumPass." + P.body, { when: span2(w) }) + (good.length > 1 ? t("sil.sumMore", { n: good.length - 1 }) : "");
     }
     const c = ov.closest;
     return t("sil.sumNone", { time: c ? hm(c.t) : "–", d: c ? fix(Math.abs(c.dAz)) : "–" });
@@ -451,8 +455,7 @@ export async function renderSilhouette(root, ctx) {
     if (!keepTime || tMs == null || tMs < a || tMs > b) {
       // 처음 시각: 겹치는 순간 → (오늘이면) 지금 → 가장 가까운 때
       const now = Date.now(), mid = (w) => Math.round((w.start + w.end) / 2 / 60e3) * 60e3;
-      if (M.ov.windows.length) tMs = mid(M.ov.windows[0]);
-      else if (M.behind.length) tMs = mid(M.behind[0]);
+      if (M.good.length) tMs = mid(M.good[0]);
       else if (isToday && now >= a && now <= b) tMs = Math.floor(now / 60e3) * 60e3;
       else if (M.ov.closest) tMs = M.ov.closest.t;
       else tMs = a;
