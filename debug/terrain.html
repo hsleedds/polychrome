@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>terrain debug</title>
+<script src="../core/sky-core.js"></script><script src="../core/terrain-core.js"></script>
+<pre id="o">running…</pre>
+<script>
+(async () => {
+  const o = document.getElementById("o"); const log = (s) => o.textContent += "\n" + s;
+  try {
+    const T = TerrainCore, src = T.terrariumSource();
+    const pts = [[37.5497,127.031,"응봉산"],[37.5512,126.9883,"남산타워"],[37.5665,126.978,"시청"],[37.6587,126.978,"북한산 백운대 근처"],[37.51,127.10,"잠실"]];
+    const r = await src.elevations(pts.map(([lat,lon])=>({lat,lon})));
+    pts.forEach((p,i)=>log(`${p[2]}: ${r[i]}`));
+    const r2 = await src.elevations(pts.map(([lat,lon])=>({lat,lon,resM:500})));
+    pts.forEach((p,i)=>log(`${p[2]} (res500): ${r2[i]}`));
+    const prof = await T.horizonProfile(src, { lat: 37.5497, lon: 127.031, eyeM: 1.6, maxKm: 40, stepDeg: 1 });
+    log("groundM " + prof.groundM + " samples " + prof.samples);
+    for (let a = 0; a < 360; a += 15) log(`az ${a}: alt ${prof.alt[a].toFixed(2)} dist ${prof.distKm[a].toFixed(2)}`);
+    log("stats " + JSON.stringify(src.stats));
+  } catch (e) { log("ERR " + e.stack); }
+})();
+</script>
