@@ -290,7 +290,7 @@ ul.plain { margin: 0; padding-left: 18px; font-size: 14px; }
 .sil .fld > span, .sil legend { font-size: 13px; color: var(--muted); }
 .sil fieldset.fld { border: 0; padding: 0; margin: 0; }
 .sil legend { padding: 0; margin-bottom: 6px; }
-.sil input[type=number], .sil input[type=date], .sil select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px;
+.sil input[type=number], .sil input[type=text], .sil input[type=date], .sil select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px;
   background: var(--card); color: var(--text); font: inherit; font-size: 16px; /* iOS: 16px 미만이면 확대됨 */ -webkit-appearance: none; appearance: none; }
 .sil select { background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
   background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 26px; }
@@ -372,3 +372,16 @@ ul.plain { margin: 0; padding-left: 18px; font-size: 14px; }
 .sil-inview:empty { display: none; }
 .sil-now[hidden] { display: none; }
 .sil-card { scroll-margin-top: 64px; }
+
+/* 내 촬영지 */
+.sil-myspots { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.spot-chip { display: inline-flex; align-items: center; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--line); background: var(--bg); }
+.spot-chip.on { box-shadow: inset 0 0 0 1.5px var(--rain); background: var(--rain-soft); }
+.spot-chip .chip-btn { box-shadow: none; background: transparent; padding-right: 4px; }
+.spot-chip .chip-btn small { font-weight: 400; opacity: .7; margin-left: 2px; }
+.spot-del { min-width: 40px; min-height: 40px; font-size: 18px; color: var(--muted); border-radius: 99px; }
+.chip-btn.add { box-shadow: none; border: 1px dashed var(--line); background: transparent; color: var(--rain); }
+.sil-addspot { margin: 0 0 10px; }
+.sil-addspot-btns { display: flex; gap: 8px; margin-top: 6px; }
+.sil-addspot-btns .btn { min-height: 44px; flex: 1; }
+.sil-paste { margin-top: 8px; }
