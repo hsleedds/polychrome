@@ -12,7 +12,7 @@ const descKey = (key) => "shoot." + key + (!ownForecast() && (key === "forecast"
 export const SHOOT_ITEMS = [
   { key: "forecast", icon: "camera" },
   { key: "line", icon: "line" },
-  { key: "dates", icon: "calendar" },
+  { key: "dates", icon: "calendar", href: "#/shoot/silhouette", live: true }, // 날짜 찾기는 실루엣 미리보기의 「겹치는 날짜」
   { key: "silhouette", icon: "silhouette", live: true },
   { key: "view", icon: "mountain" },
   { key: "aurora", icon: "aurora", href: "#/aurora", live: true },
