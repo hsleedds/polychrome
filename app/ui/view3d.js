@@ -116,7 +116,7 @@ export function createView3d(container, host, mode0 = "ground") {
           vec3 c = mix(hor, zen, pow(clamp(h, 0.0, 1.0), 0.45));
           if (h < 0.0) c = mix(hor, hor * 0.55, clamp(-h * 6.0, 0.0, 1.0));
           float s = max(dot(d, normalize(sunDir)), 0.0);
-          c += vec3(1.0, 0.85, 0.6) * glow * (pow(s, 6.0) * 0.25 + pow(s, 80.0) * 0.5);
+          c += vec3(1.0, 0.82, 0.55) * glow * (pow(s, 8.0) * 0.16 + pow(s, 600.0) * 0.22); // 둥근 빛무리는 좁고 약하게 — 해 원반이 묻히지 않게
           gl_FragColor = vec4(c, 1.0); }`,
       side: T.BackSide, depthTest: false, depthWrite: false, fog: false,
     });
@@ -382,8 +382,10 @@ export function createView3d(container, host, mode0 = "ground") {
       const p = proj(C.dirVec(b.az, b.alt));
       const rpx = (b.diamDeg / 2) / V.hfov * w;
       if (p && rpx < 9 && p[0] > -20 && p[0] < w + 20 && p[1] > -20 && p[1] < h + 20) {
-        x.strokeStyle = "rgba(255,255,255,.85)"; x.lineWidth = 1.5; x.setLineDash([4, 4]);
-        x.beginPath(); x.arc(p[0], p[1], rpx + 12, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
+        // 밝은 하늘·어두운 땅 어디서나 보이게 검정+흰 두 겹 고리
+        x.beginPath(); x.arc(p[0], p[1], rpx + 12, 0, Math.PI * 2);
+        x.strokeStyle = "rgba(0,0,0,.55)"; x.lineWidth = 3.5; x.stroke();
+        x.strokeStyle = "rgba(255,255,255,.95)"; x.lineWidth = 1.5; x.setLineDash([4, 4]); x.stroke(); x.setLineDash([]);
       }
     }
     // 렌즈 틀 + 바깥 70% 검정 (가운데 고정)
